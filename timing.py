@@ -12,8 +12,7 @@ class Timing(ABC):
     '''
     c = value('speed of light in vacuum')
 
-    def __init__(self, shower: Shower, axis: Axis, counters: Counters):
-        self.shower = shower
+    def __init__(self, axis: Axis, counters: Counters):
         self.axis = axis
         self.counters = counters
         self.counter_time = self.counter_time()
@@ -63,8 +62,7 @@ class DownwardTiming(Timing):
     correction for atmospheric curveature
     '''
 
-    def __init__(self, shower: Shower, axis: MakeDownwardAxis, counters: Counters):
-        self.shower = shower
+    def __init__(self, axis: MakeDownwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         self.counter_time = self.counter_time()
@@ -101,8 +99,7 @@ class DownwardTimingCurved(Timing):
     athmosphere, this will be useful for showers with a relatively high zenith
     angle'''
 
-    def __init__(self, shower: Shower, axis: MakeDownwardAxis, counters: Counters):
-        self.shower = shower
+    def __init__(self, axis: MakeDownwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         self.counter_time = self.counter_time()
@@ -157,8 +154,7 @@ class UpwardTiming(Timing):
     correction for atmospheric curveature
     '''
 
-    def __init__(self, shower: Shower, axis: MakeUpwardAxis, counters: Counters):
-        self.shower = shower
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         self.counter_time = self.counter_time()
@@ -195,8 +191,7 @@ class UpwardTimingCurved(Timing):
     correction for atmospheric curveature.
     '''
 
-    def __init__(self, shower: Shower, axis: MakeUpwardAxis, counters: Counters):
-        self.shower = shower
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         self.counter_time = self.counter_time()
