@@ -23,8 +23,6 @@ class Timing(ABC):
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        # shower_time = self.axis_time[self.shower.profile(axis.X) > 100.]
-        # return shower_time + self.travel_time + self.delay
         return self.axis_time + self.travel_time + self.delay()
 
     @property
