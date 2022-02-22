@@ -93,6 +93,12 @@ class Counters(ABC):
         '''This method computes the ACUTE angles between the shower axis and the
         vectors toward each counter'''
 
+    @abstractmethod
+    def get_timing_factory(self):
+        '''This method should return the specific timing factory needed for
+        the specific axis-counter combination
+        '''
+
 class MakeOrbitalArray(Counters):
     '''This is the implementation of orbital Cherenkov counters'''
 
@@ -100,6 +106,9 @@ class MakeOrbitalArray(Counters):
         '''In this case we need pi minus the interal angle across from the
         distance to the counter'''
         return np.pi - self.calculate_theta(axis)
+
+    def get_timing_factory(self):
+        return UpwardTimingFactory()
 
     def __repr__(self):
         return f"OrbitalArray({self.vectors.shape[0]} counters with area {self.area})"
@@ -112,6 +121,9 @@ class MakeGroundArray(Counters):
 
     def theta(self, axis: Axis):
         return self.calculate_theta(axis)
+
+    def get_timing_factory(self):
+        return DownwardTimingFactory()
 
 class Timing(ABC):
     '''This is the abstract base class which contains the methods needed for
@@ -369,10 +381,10 @@ class DownwardTimingFactory(TimingFactory):
     '''
 
     def get_timing(self):
-        return DownwardTiming()
+        return DownwardTiming
 
     def get_curved_timing(self):
-        return DownwardTimingCurved()
+        return DownwardTimingCurved
 
 class UpwardTimingFactory(TimingFactory):
     '''This is the implementation of the timing factory for upward-going
@@ -380,7 +392,7 @@ class UpwardTimingFactory(TimingFactory):
     '''
 
     def get_timing(self):
-        return UpwardTiming()
+        return UpwardTiming
 
     def get_curved_timing(self):
-        return UpwardTimingCurved()
+        return UpwardTimingCurved

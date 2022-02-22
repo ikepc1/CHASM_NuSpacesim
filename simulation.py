@@ -206,9 +206,11 @@ class ShowerSimulation:
             axis = self.ingredients['axis'][0]
             counters = self.ingredients['counters'][0]
             y = self.ingredients['yield'][0]
-            self.timing_curved = DownwardTimingCurved(axis, counters)
-            self.timing = DownwardTiming(axis, counters)
             self.signal = Signal(shower, axis, counters, y)
+            factory = counters.get_timing_factory()
+            timing = factory.get_timing()
+            self.timing = timing(axis, counters)
+            self.timing_curved = counters.get_timing_factory().get_curved_timing()(axis,counters)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -223,7 +225,7 @@ if __name__ == '__main__':
     from shower import *
     plt.ion()
 
-    theta = np.radians(30)
+    theta = np.radians(80)
     phi = np.pi
 
     # x = np.linspace(0,10000,11)
