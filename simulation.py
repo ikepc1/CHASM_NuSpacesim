@@ -2,7 +2,7 @@ from shower import *
 from axis import *
 from counters import *
 from generate_Cherenkov import *
-from timing import *
+# from timing import *
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 
@@ -206,8 +206,8 @@ class ShowerSimulation:
             axis = self.ingredients['axis'][0]
             counters = self.ingredients['counters'][0]
             y = self.ingredients['yield'][0]
-            self.timing_curved = DownwardTimingCurved(shower, axis, counters)
-            self.timing = DownwardTiming(shower, axis, counters)
+            self.timing_curved = DownwardTimingCurved(axis, counters)
+            self.timing = DownwardTiming(axis, counters)
             self.signal = Signal(shower, axis, counters, y)
 
     def plot_profile(self):
@@ -223,7 +223,7 @@ if __name__ == '__main__':
     from shower import *
     plt.ion()
 
-    theta = np.radians(80)
+    theta = np.radians(30)
     phi = np.pi
 
     # x = np.linspace(0,10000,11)
