@@ -1,7 +1,6 @@
 import numpy as np
 from counters import *
 from axis import *
-from shower import *
 from scipy.constants import value,nano
 from abc import ABC, abstractmethod
 
