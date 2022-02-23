@@ -102,7 +102,7 @@ class Counters(ABC):
 class MakeOrbitalArray(Counters):
     '''This is the implementation of orbital Cherenkov counters'''
 
-    def theta(self, axis: Axis):
+    def theta(self, axis: MakeUpwardAxis):
         '''In this case we need pi minus the interal angle across from the
         distance to the counter'''
         return np.pi - self.calculate_theta(axis)
@@ -119,7 +119,7 @@ class MakeGroundArray(Counters):
     def __repr__(self):
         return f"GroundArray({self.vectors.shape[0]} counters with area {self.area})"
 
-    def theta(self, axis: Axis):
+    def theta(self, axis: MakeDownwardAxis):
         return self.calculate_theta(axis)
 
     def get_timing_factory(self):
