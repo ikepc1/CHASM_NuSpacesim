@@ -175,8 +175,8 @@ class Signal:
         self.Nch = self.shower.profile(axis.X)
         self.theta = self.counters.theta(axis)
         self.omega = self.counters.omega(axis)
-        self.ng = self.calculate_ng()
-        self.ng_sum = self.ng.sum(axis = 1)
+        # self.ng = self.calculate_ng()
+        # self.ng_sum = self.ng.sum(axis = 1)
 
     def calculate_gg(self):
         '''This funtion returns the interpolated values of gg at a given deltas
@@ -242,7 +242,7 @@ class ShowerSimulation:
                 return False
         return True
 
-    def run(self, curved = True):
+    def run(self, curved = False):
         shower = self.ingredients['shower'][0]
         counters = self.ingredients['counters'][0]
         y = self.ingredients['yield'][0]
@@ -271,8 +271,8 @@ if __name__ == '__main__':
     from shower import *
     plt.ion()
 
-    theta = np.linspace(.01, np.radians(80),100)
-    phi = np.linspace(0, 1.999*np.pi, 10)
+    # theta = np.linspace(.01, np.radians(80),100)
+    # phi = np.linspace(0, 1.999*np.pi, 10)
 
     # x = np.linspace(0,10000,11)
     # xx, yy = np.meshgrid(x,x)
@@ -281,31 +281,33 @@ if __name__ == '__main__':
     # counters[:,1] = yy.flatten()
     # counters[:,2] = np.zeros(xx.size)
 
-    counters = np.zeros([30,3])
-    counters[:,0] = np.logspace(-1,3,30)
+    # counters = np.zeros([30,3])
+    # counters[:,0] = np.logspace(-1,3,30)
 
-    # counters = np.empty([100,3])
-    #
-    # r = 2141673.2772862054
-    #
-    # x = r * np.sin(theta) * np.cos(phi)
-    # y = r * np.sin(theta) * np.sin(phi)
-    # z = r * np.cos(theta)
-    #
-    # counters[:,0] = np.full(100,x)
-    # # counters[:,0] = np.linspace(-1000,1000,100)
-    # counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
-    # counters[:,2] = np.full(100,z)
+    counters = np.empty([100,3])
+
+    theta = np.radians(85)
+    phi = 0.
+    r = 2141673.2772862054
+
+    x = r * np.sin(theta) * np.cos(phi)
+    y = r * np.sin(theta) * np.sin(phi)
+    z = r * np.cos(theta)
+
+    counters[:,0] = np.full(100,x)
+    # counters[:,0] = np.linspace(-1000,1000,100)
+    counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
+    counters[:,2] = np.full(100,z)
 
     area = 0.03141593
 
     sim = ShowerSimulation()
-    sim.add(DownwardAxis(theta,phi))
+    sim.add(UpwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(GroundArray(counters, area))
+    sim.add(OrbitalArray(counters, area))
     sim.add(Yield(300,450))
     # sim.plot_profile()
-    sim.run()
+    sim.run(curved = True)
 
     # plt.figure()
     # plt.plot(sim.ingredients['axis'][0].r,sim.timing.delay()[0], label = 'flat atm')

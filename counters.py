@@ -135,7 +135,7 @@ class Timing(ABC):
     def __init__(self, axis: Axis, counters: Counters):
         self.axis = axis
         self.counters = counters
-        self.counter_time = self.counter_time()
+        # self.counter_time = self.counter_time()
 
     def counter_time(self) -> np.ndarray:
         '''This method returns the time it takes after the shower starts along
@@ -185,11 +185,10 @@ class DownwardTiming(Timing):
     def __init__(self, axis: MakeDownwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
-        self.counter_time = self.counter_time()
+        # self.counter_time = self.counter_time()
 
     def __repr__(self):
-        return f"DownwardTiming(shower=({self.shower.__repr__}), \
-                                axis=({self.axis.__repr__}), \
+        return f"DownwardTiming(axis=({self.axis.__repr__}), \
                                 counters=({self.counters.__repr__}))"
 
     def vertical_delay(self):
@@ -222,7 +221,11 @@ class DownwardTimingCurved(Timing):
     def __init__(self, axis: MakeDownwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
-        self.counter_time = self.counter_time()
+        # self.counter_time = self.counter_time()
+
+    def __repr__(self):
+        return f"DownwardTimingCurved(axis=({self.axis.__repr__}), \
+                                      counters=({self.counters.__repr__}))"
 
     @property
     def axis_time(self) -> np.ndarray:
@@ -277,12 +280,11 @@ class UpwardTiming(Timing):
     def __init__(self, axis: MakeUpwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
-        self.counter_time = self.counter_time()
+        # self.counter_time = self.counter_time()
 
     def __repr__(self):
-        return f"DownwardTiming(shower=({self.shower.__repr__}), \
-                                axis=({self.axis.__repr__}), \
-                                counters=({self.counters.__repr__}))"
+        return f"UpwardTiming(axis=({self.axis.__repr__}), \
+                             counters=({self.counters.__repr__}))"
 
     def vertical_delay(self):
         '''This is the delay a vertically travelling photon would experience
@@ -314,12 +316,11 @@ class UpwardTimingCurved(Timing):
     def __init__(self, axis: MakeUpwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
-        self.counter_time = self.counter_time()
+        # self.counter_time = self.counter_time()
 
     def __repr__(self):
-        return f"DownwardTiming(shower=({self.shower.__repr__}), \
-                                axis=({self.axis.__repr__}), \
-                                counters=({self.counters.__repr__}))"
+        return f"UpwardTimingCurved(axis=({self.axis.__repr__}), \
+                                   counters=({self.counters.__repr__}))"
 
     @property
     def axis_time(self) -> np.ndarray:
