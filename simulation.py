@@ -271,6 +271,15 @@ class ShowerSimulation:
         plt.figure()
         plt.plot(a.X, s.profile(a.X))
 
+    def get_photons(self, i=0, j=0):
+        return self.signals[i,j].calculate_ng()
+
+    def get_photon_sum(self, i=0, j=0):
+        return self.get_photons(i,j).sum(axis=1)
+
+    def get_times(self, i=0, j=0):
+        return self.times[i,j].counter_time()
+
 
 if __name__ == '__main__':
     import numpy as np
@@ -314,13 +323,3 @@ if __name__ == '__main__':
     sim.add(Yield(300,450))
     # sim.plot_profile()
     sim.run(curved = True)
-
-    # plt.figure()
-    # plt.plot(sim.ingredients['axis'][0].r,sim.timing.delay()[0], label = 'flat atm')
-    # plt.plot(sim.ingredients['axis'][0].r,sim.timing_curved.delay()[0], label = 'curved atm')
-    # plt.legend()
-    #
-    # plt.figure()
-    # plt.scatter(counters[:,0],sim.signal.ng_sum)
-    # plt.loglog()
-    # plt.grid()
