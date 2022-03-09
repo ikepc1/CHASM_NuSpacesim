@@ -2,7 +2,7 @@ from shower import *
 from axis import *
 from counters import *
 from generate_Cherenkov import *
-from timing import *
+# from timing import *
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 
@@ -11,8 +11,15 @@ class Element(ABC):
     '''This is an abstract base class containing the methods needed for
     implementing a specific class in the broader simulation'''
 
+    def convert_to_iterable(self, input_value):
+        '''If one of the element arguments is a single value, it needs to be '''
+        if np.size(input_value) == 1:
+            return [input_value]
+        else:
+            return np.array(input_value)
+
     @abstractmethod
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         '''The element implementation should recieve the user arguments that the
         element itself needs and its __init__ should save them as attributes'''
 
@@ -27,7 +34,52 @@ class Element(ABC):
     def create(self):
         '''This method instantiates the specific element in question'''
 
-class DownwardAxis(Element):
+class AxisElement(Element):
+    '''This middleman class contains the setters for the theta and phi
+    properties, which are the same for both axis types'''
+    @property
+    def theta(self):
+        '''This is the phi property'''
+        return self._theta
+
+    @theta.setter
+    def theta(self, input_value):
+        '''If the value is a single value, convert it into a list with just
+        that value, otherwise just pass a numpy array
+        '''
+        self._theta = self.convert_to_iterable(input_value)
+
+    @property
+    def phi(self):
+        '''This is the phi property'''
+        return self._phi
+
+    @phi.setter
+    def phi(self, input_value):
+        '''If the value is a single value, convert it into a list with just
+        that value, otherwise just pass a numpy array
+        '''
+        self._phi = self.convert_to_iterable(input_value)
+
+class DownwardAxis(AxisElement):
+    '''This is the implementation of the downward axis element'''
+    element_type = 'axis'
+
+    def __init__(self, theta: np.ndarray, phi: np.ndarray, ground_level: np.ndarray = 0.):
+        self.theta = theta
+        self.phi = phi
+        self.ground_level = ground_level
+
+    def create(self) -> MakeDownwardAxis:
+        '''this method returns a dictionary element instantiated DownwardAxis
+        class'''
+        object_list = np.empty((np.size(self.theta), np.size(self.phi)), dtype = 'O')
+        for i, t in enumerate(self.theta):
+            for j, p in enumerate(self.phi):
+                object_list[i, j] = MakeDownwardAxis(t, p, self.ground_level)
+        return object_list
+
+class UpwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
@@ -39,21 +91,11 @@ class DownwardAxis(Element):
     def create(self) -> MakeDownwardAxis:
         '''this method returns a dictionary element instantiated DownwardAxis
         class'''
-        return MakeDownwardAxis(self.theta, self.phi, self.ground_level)
-
-class UpwardAxis(Element):
-    '''This is the implementation of the downward axis element'''
-    element_type = 'axis'
-
-    def __init__(self, theta: float, phi: float, ground_level: float = 0):
-        self.theta = theta
-        self.phi = phi
-        self.ground_level = ground_level
-
-    def create(self) -> MakeDownwardAxis:
-        '''this method returns a dictionary element instantiated DownwardAxis
-        class'''
-        return MakeUpwardAxis(self.theta, self.phi, self.ground_level)
+        object_list = np.empty((np.size(self.theta), np.size(self.phi)), dtype = 'O')
+        for i, t in enumerate(self.theta):
+            for j, p in enumerate(self.phi):
+                object_list[i, j] = MakeUpwardAxis(t, p, self.ground_level)
+        return object_list
 
 class GHShower(Element):
     '''This is the implementation of the GH shower element'''
@@ -67,7 +109,7 @@ class GHShower(Element):
 
     def create(self):
         '''This method returns an instantiated Gaisser Hillas Shower '''
-        return MakeGHShower(self.X_max, self.N_max, self.X0, self.Lambda)
+        return self.convert_to_iterable(MakeGHShower(self.X_max, self.N_max, self.X0, self.Lambda))
 
 class UserShower(Element):
     '''This is the implementation of the GH shower element'''
@@ -79,7 +121,7 @@ class UserShower(Element):
 
     def create(self):
         '''This method returns an instantiated user shower '''
-        return MakeUserShower(self.X, self.Nch)
+        return self.convert_to_iterable(MakeUserShower(self.X, self.Nch))
 
 class OrbitalArray(Element):
     '''This is the implementation of the orbital array element'''
@@ -91,7 +133,7 @@ class OrbitalArray(Element):
 
     def create(self):
         '''This method returns an instantiated orbital array'''
-        return MakeOrbitalArray(self.vectors, self.area)
+        return self.convert_to_iterable(MakeOrbitalArray(self.vectors, self.area))
 
 class GroundArray(Element):
     '''This is the implementation of the ground array element'''
@@ -103,7 +145,7 @@ class GroundArray(Element):
 
     def create(self):
         '''This method returns an instantiated orbital array'''
-        return MakeGroundArray(self.vectors, self.area)
+        return self.convert_to_iterable(MakeGroundArray(self.vectors, self.area))
 
 class Yield(Element):
     '''This is the implementation of the yield element'''
@@ -115,7 +157,7 @@ class Yield(Element):
 
     def create(self):
         '''This method returns an instantiated yield object'''
-        return MakeYield(self.l_min, self.l_max)
+        return self.convert_to_iterable(MakeYield(self.l_min, self.l_max))
 
 class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
@@ -133,8 +175,8 @@ class Signal:
         self.Nch = self.shower.profile(axis.X)
         self.theta = self.counters.theta(axis)
         self.omega = self.counters.omega(axis)
-        self.ng = self.calculate_ng()
-        self.ng_sum = self.ng.sum(axis = 1)
+        # self.ng = self.calculate_ng()
+        # self.ng_sum = self.ng.sum(axis = 1)
 
     def calculate_gg(self):
         '''This funtion returns the interpolated values of gg at a given deltas
@@ -176,26 +218,26 @@ class ShowerSimulation:
 
     def __init__(self):
         self.ingredients = {
-        'axis': [],
-        'shower': [],
-        'counters': [],
-        'yield': []
+        'axis': None,
+        'shower': None,
+        'counters': None,
+        'yield': None
         }
 
     def add(self, element: Element):
         '''Add a element to the list of elements for the sim to perform'''
-        self.ingredients[element.element_type].append(element.create())
+        self.ingredients[element.element_type] = element.create()
 
     def remove(self, type):
         '''Remove all ingredients of a certain type from simulation'''
-        self.ingredients[type] = []
+        self.ingredients[type] = None
 
     def check_ingredients(self) -> bool:
         '''This method checks to see if the simulation has the neccesary
         elements to generate a Cherenkov signal.
         '''
         for element_type in self.ingredients:
-            if self.ingredients[element_type] == []:
+            if type(self.ingredients[element_type]) == None:
                 print(f"Simulation needs {element_type}")
                 return False
         return True
@@ -229,8 +271,8 @@ if __name__ == '__main__':
     from shower import *
     plt.ion()
 
-    theta = np.radians(80)
-    phi = np.pi
+    # theta = np.linspace(.01, np.radians(80),100)
+    # phi = np.linspace(0, 1.999*np.pi, 10)
 
     # x = np.linspace(0,10000,11)
     # xx, yy = np.meshgrid(x,x)
@@ -239,38 +281,40 @@ if __name__ == '__main__':
     # counters[:,1] = yy.flatten()
     # counters[:,2] = np.zeros(xx.size)
 
-    counters = np.zeros([30,3])
-    counters[:,0] = np.logspace(-1,3,30)
+    # counters = np.zeros([30,3])
+    # counters[:,0] = np.logspace(-1,3,30)
 
-    # counters = np.empty([100,3])
-    #
-    # r = 2141673.2772862054
-    #
-    # x = r * np.sin(theta) * np.cos(phi)
-    # y = r * np.sin(theta) * np.sin(phi)
-    # z = r * np.cos(theta)
-    #
-    # counters[:,0] = np.full(100,x)
-    # # counters[:,0] = np.linspace(-1000,1000,100)
-    # counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
-    # counters[:,2] = np.full(100,z)
+    counters = np.empty([100,3])
+
+    theta = np.radians(85)
+    phi = 0.
+    r = 2141673.2772862054
+
+    x = r * np.sin(theta) * np.cos(phi)
+    y = r * np.sin(theta) * np.sin(phi)
+    z = r * np.cos(theta)
+
+    counters[:,0] = np.full(100,x)
+    # counters[:,0] = np.linspace(-1000,1000,100)
+    counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
+    counters[:,2] = np.full(100,z)
 
     area = 0.03141593
 
     sim = ShowerSimulation()
-    sim.add(DownwardAxis(theta,phi))
+    sim.add(UpwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(GroundArray(counters, area))
+    sim.add(OrbitalArray(counters, area))
     sim.add(Yield(300,450))
     # sim.plot_profile()
-    sim.run()
+    sim.run(curved = True)
 
-    plt.figure()
-    plt.plot(sim.ingredients['axis'][0].r,sim.timing.delay()[0], label = 'flat atm')
-    plt.plot(sim.ingredients['axis'][0].r,sim.timing_curved.delay()[0], label = 'curved atm')
-    plt.legend()
-
-    plt.figure()
-    plt.scatter(counters[:,0],sim.signal.ng_sum)
-    plt.loglog()
-    plt.grid()
+    # plt.figure()
+    # plt.plot(sim.ingredients['axis'][0].r,sim.timing.delay()[0], label = 'flat atm')
+    # plt.plot(sim.ingredients['axis'][0].r,sim.timing_curved.delay()[0], label = 'curved atm')
+    # plt.legend()
+    #
+    # plt.figure()
+    # plt.scatter(counters[:,0],sim.signal.ng_sum)
+    # plt.loglog()
+    # plt.grid()
