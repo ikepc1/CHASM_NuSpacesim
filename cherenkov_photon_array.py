@@ -69,6 +69,7 @@ class CherenkovPhotonArray:
 
         gg4 = self.gg_t_delta_theta[jt:jt+2,jd:jd+2]
         gg2 = gg4[0]*(1-st) + gg4[1]*st
+        gg2[gg2 == 0] = 0.00001
         gg  = gg2[0]*(gg2[1]/gg2[0])**sd
         return gg
 
