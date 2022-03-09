@@ -200,15 +200,21 @@ class ShowerSimulation:
                 return False
         return True
 
-    def run(self):
+    def run(self, curved = False):
+        shower = self.ingredients['shower'][0]
+        counters = self.ingredients['counters'][0]
+        y = self.ingredients['yield'][0]
+        axis = self.ingredients['axis']
+        self.signals = np.empty_like(self.ingredients['axis'])
+        self.times = np.empty_like(self.ingredients['axis'])
         if self.check_ingredients():
-            shower = self.ingredients['shower'][0]
-            axis = self.ingredients['axis'][0]
-            counters = self.ingredients['counters'][0]
-            y = self.ingredients['yield'][0]
-            self.timing_curved = DownwardTimingCurved(axis, counters)
-            self.timing = DownwardTiming(axis, counters)
-            self.signal = Signal(shower, axis, counters, y)
+            for i in range(axis.shape[0]):
+                for j in range(axis.shape[1]):
+                    self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
+                    if curved:
+                        self.times[i,j] = counters.get_timing_factory().get_curved_timing()(axis[i,j],counters)
+                    else:
+                        self.times[i,j] = counters.get_timing_factory().get_timing()(axis[i,j],counters)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
