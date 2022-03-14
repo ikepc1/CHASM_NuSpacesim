@@ -2,10 +2,9 @@ from shower import *
 from axis import *
 from counters import *
 from generate_Cherenkov import *
-# from timing import *
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
-
+import eventio as ei
 
 class Element(ABC):
     '''This is an abstract base class containing the methods needed for
@@ -158,6 +157,113 @@ class Yield(Element):
     def create(self):
         '''This method returns an instantiated yield object'''
         return self.convert_to_iterable(MakeYield(self.l_min, self.l_max))
+
+class MakeCORSIKAShower(MakeUserShower):
+    '''This class is the implementation where a shower profile is imported from
+    a CORSIKA IACT run. This is for comparing the universality model to CORSIKA
+
+    It uses the eventio package so python can access the CORSIKA data
+    '''
+    def __init__(self, iact_file, event_number):
+        li = self.get_event_longitudinal(iact_file, event_number)
+        nl = li['nthick']
+        iact_X = np.arange(nl,dtype=float) * li['thickstep']
+        iact_nch = np.array(li['data'][6])
+        super().__init__(iact_X, iact_nch)
+
+    def get_event_longitudinal(self, iact_file, event_number):
+        '''This method gathers the desired event from an iact_file'''
+
+        events = []
+        for event in ei.IACTfile(iact_file):
+            events.append(event.longitudinal)
+        return events[event_number - 1]
+
+class CORSIKAShower(Element):
+    '''This is the implementation of the CORSIKA shower element'''
+
+    def  __init__(self, iact_file: str, event_number: int = 1):
+        self.iact_file = iact_file
+        self.event_number = event_number
+
+    def create(self):
+        return self.convert_to_iterable(MakeCORSIKAShower(self.iact_file, self.event_number))
+
+def get_event(iact_file, event_number):
+    '''This function gathers the desired event from an iact_file'''
+
+    events = []
+    for event in ei.IACTfile(iact_file):
+        events.append(event)
+    return events[event_number - 1]
+
+def get_header(self, iact_file):
+    return ei.IACTfile(iact_file).header
+
+class MakeCORSIKAAxis(MakeDownwardAxis):
+    '''This is the implementation of an axis imported from CORSIKA
+    '''
+
+    def __init__(self, iact_file: str, event_number: int):
+        event = get_event(iact_file, event_number)
+        header = get_header(iact_file)
+        theta = event.header[10]
+        phi = event.header[11] + np.pi
+        ground_level = header[5][0]
+        super().__init__(iact_X, iact_nch, ground_level)
+
+class CORSIKAAxis(Element):
+    '''This is the implementation of the CORSIKA axis element
+    '''
+
+    def  __init__(self, iact_file: str, event_number: int = 1):
+        self.iact_file = iact_file
+        self.event_number = event_number
+
+    def create(self):
+        return self.convert_to_iterable(MakeCORSIKAAxis(self.iact_file, self.event_number))
+
+class MakeCORSIKAArray(MakeGroundArray):
+    '''This is the implementation of a ground counter array imported from
+    CORSIKA IACT
+    '''
+
+    def __init__(self, iact_file: str):
+        e = ei.IACTfile(iact_file)
+        super().__init__(self.make_tel_vector_array(e), self.get_tel_area(e))
+
+    def make_tel_vector_array(self, e):
+        x = e.telescope_positions['x']
+        y = e.telescope_positions['y']
+        z = e.telescope_positions['z']
+        return np.vstack((x,y,z)).T
+
+    def get_tel_area(self, e):
+        r = e.telescope_positions['r']
+        return np.pi * r**2
+
+class CORSIKAArray(Element):
+    def  __init__(self, iact_file: str):
+        self.iact_file = iact_file
+
+    def create(self):
+        return self.convert_to_iterable(MakeCORSIKAArray(self.iact_file))
+
+class MakeCORSIKAYield(MakeYield):
+    '''This is the implementation of the yield interval imported from CORSIKA
+    '''
+
+    def __init__(self, iact_file: str, event_number: int = 1):
+        event = get_event(iact_file, event_number)
+        super().__init__(event.header[57], event.header[58])
+
+class CORSIKAYield(Element):
+    def  __init__(self, iact_file: str, event_number: int = 1):
+        self.iact_file = iact_file
+        self.event_number = event_number
+
+    def create(self):
+        return self.convert_to_iterable(MakeCORSIKAYield(self.iact_file, self.event_number))
 
 class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
