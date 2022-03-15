@@ -25,8 +25,8 @@ class Shower(ABC):
     @N_max.setter
     def N_max(self, N_max):
         '''N_max property setter'''
-        if not N_max.is_integer():
-            raise ValueError("Non integer N_max")
+        # if not N_max.is_integer():
+        #     raise ValueError("Non integer N_max")
         self._N_max = N_max
 
     @property

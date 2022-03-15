@@ -175,12 +175,13 @@ class MakeCORSIKAShower(MakeUserShower):
         '''This method gathers the desired event from an iact_file'''
 
         events = []
-        for event in ei.IACTfile(iact_file):
+        for event in ei.IACTFile(iact_file):
             events.append(event.longitudinal)
         return events[event_number - 1]
 
 class CORSIKAShower(Element):
     '''This is the implementation of the CORSIKA shower element'''
+    element_type = 'shower'
 
     def  __init__(self, iact_file: str, event_number: int = 1):
         self.iact_file = iact_file
@@ -193,12 +194,12 @@ def get_event(iact_file, event_number):
     '''This function gathers the desired event from an iact_file'''
 
     events = []
-    for event in ei.IACTfile(iact_file):
+    for event in ei.IACTFile(iact_file):
         events.append(event)
     return events[event_number - 1]
 
-def get_header(self, iact_file):
-    return ei.IACTfile(iact_file).header
+def get_header(iact_file):
+    return ei.IACTFile(iact_file).header
 
 class MakeCORSIKAAxis(MakeDownwardAxis):
     '''This is the implementation of an axis imported from CORSIKA
@@ -210,11 +211,12 @@ class MakeCORSIKAAxis(MakeDownwardAxis):
         theta = event.header[10]
         phi = event.header[11] + np.pi
         ground_level = header[5][0]
-        super().__init__(iact_X, iact_nch, ground_level)
+        super().__init__(theta, phi, ground_level)
 
 class CORSIKAAxis(Element):
     '''This is the implementation of the CORSIKA axis element
     '''
+    element_type = 'axis'
 
     def  __init__(self, iact_file: str, event_number: int = 1):
         self.iact_file = iact_file
@@ -229,7 +231,7 @@ class MakeCORSIKAArray(MakeGroundArray):
     '''
 
     def __init__(self, iact_file: str):
-        e = ei.IACTfile(iact_file)
+        e = ei.IACTFile(iact_file)
         super().__init__(self.make_tel_vector_array(e), self.get_tel_area(e))
 
     def make_tel_vector_array(self, e):
@@ -239,10 +241,11 @@ class MakeCORSIKAArray(MakeGroundArray):
         return np.vstack((x,y,z)).T
 
     def get_tel_area(self, e):
-        r = e.telescope_positions['r']
+        r = e.telescope_positions['r'][0]
         return np.pi * r**2
 
 class CORSIKAArray(Element):
+    element_type = 'counters'
     def  __init__(self, iact_file: str):
         self.iact_file = iact_file
 
@@ -258,6 +261,7 @@ class MakeCORSIKAYield(MakeYield):
         super().__init__(event.header[57], event.header[58])
 
 class CORSIKAYield(Element):
+    element_type = 'yield'
     def  __init__(self, iact_file: str, event_number: int = 1):
         self.iact_file = iact_file
         self.event_number = event_number
@@ -354,21 +358,29 @@ class ShowerSimulation:
                 return False
         return True
 
+    # def run(self, curved = False):
+    #     shower = self.ingredients['shower'][0]
+    #     counters = self.ingredients['counters'][0]
+    #     y = self.ingredients['yield'][0]
+    #     axis = self.ingredients['axis']
+    #     self.signals = np.empty_like(self.ingredients['axis'])
+    #     self.times = np.empty_like(self.ingredients['axis'])
+    #     if self.check_ingredients():
+    #         for i in range(axis.shape[0]):
+    #             for j in range(axis.shape[1]):
+    #                 self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
+    #                 if curved:
+    #                     self.times[i,j] = counters.get_timing_factory().get_curved_timing()(axis[i,j],counters)
+    #                 else:
+    #                     self.times[i,j] = counters.get_timing_factory().get_timing()(axis[i,j],counters)
+
     def run(self, curved = False):
         shower = self.ingredients['shower'][0]
         counters = self.ingredients['counters'][0]
         y = self.ingredients['yield'][0]
-        axis = self.ingredients['axis']
-        self.signals = np.empty_like(self.ingredients['axis'])
-        self.times = np.empty_like(self.ingredients['axis'])
-        if self.check_ingredients():
-            for i in range(axis.shape[0]):
-                for j in range(axis.shape[1]):
-                    self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
-                    if curved:
-                        self.times[i,j] = counters.get_timing_factory().get_curved_timing()(axis[i,j],counters)
-                    else:
-                        self.times[i,j] = counters.get_timing_factory().get_timing()(axis[i,j],counters)
+        axis = self.ingredients['axis'][0]
+        self.signals = Signal(shower, axis, counters, y)
+        self.timing = counters.get_timing_factory().get_timing()(axis,counters)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -392,40 +404,12 @@ if __name__ == '__main__':
     from shower import *
     plt.ion()
 
-    # theta = np.linspace(.01, np.radians(80),100)
-    # phi = np.linspace(0, 1.999*np.pi, 10)
-
-    # x = np.linspace(0,10000,11)
-    # xx, yy = np.meshgrid(x,x)
-    # counters = np.empty([xx.size,3])
-    # counters[:,0] = xx.flatten()
-    # counters[:,1] = yy.flatten()
-    # counters[:,2] = np.zeros(xx.size)
-
-    # counters = np.zeros([30,3])
-    # counters[:,0] = np.logspace(-1,3,30)
-
-    counters = np.empty([100,3])
-
-    theta = np.radians(85)
-    phi = 0.
-    r = 2141673.2772862054
-
-    x = r * np.sin(theta) * np.cos(phi)
-    y = r * np.sin(theta) * np.sin(phi)
-    z = r * np.cos(theta)
-
-    counters[:,0] = np.full(100,x)
-    # counters[:,0] = np.linspace(-1000,1000,100)
-    counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
-    counters[:,2] = np.full(100,z)
-
-    area = 0.03141593
+    corsika_file = '/home/isaac/corsika_data/close_correction4_OBSLEV_changed_THETAP_changed/iact_s_000001.dat'
 
     sim = ShowerSimulation()
-    sim.add(UpwardAxis(theta,phi))
-    sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(OrbitalArray(counters, area))
-    sim.add(Yield(300,450))
+    sim.add(CORSIKAAxis(corsika_file))
+    sim.add(CORSIKAShower(corsika_file))
+    sim.add(CORSIKAArray(corsika_file))
+    sim.add(CORSIKAYield(corsika_file))
     # sim.plot_profile()
-    sim.run(curved = True)
+    sim.run(curved = False)
