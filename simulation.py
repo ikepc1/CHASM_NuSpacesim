@@ -1,8 +1,6 @@
 from shower import *
 from axis import *
-from counters import *
 from generate_Cherenkov import *
-# from timing import *
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 
@@ -37,45 +35,46 @@ class Element(ABC):
 class AxisElement(Element):
     '''This middleman class contains the setters for the theta and phi
     properties, which are the same for both axis types'''
-    @property
-    def theta(self):
-        '''This is the phi property'''
-        return self._theta
 
-    @theta.setter
-    def theta(self, input_value):
+    @property
+    def zenith(self):
+        '''This is the phi property'''
+        return self._zenith
+
+    @zenith.setter
+    def zenith(self, input_value):
         '''If the value is a single value, convert it into a list with just
         that value, otherwise just pass a numpy array
         '''
-        self._theta = self.convert_to_iterable(input_value)
+        self._zenith = self.convert_to_iterable(input_value)
 
     @property
-    def phi(self):
+    def azimuth(self):
         '''This is the phi property'''
-        return self._phi
+        return self._azimuth
 
-    @phi.setter
-    def phi(self, input_value):
+    @azimuth.setter
+    def azimuth(self, input_value):
         '''If the value is a single value, convert it into a list with just
         that value, otherwise just pass a numpy array
         '''
-        self._phi = self.convert_to_iterable(input_value)
+        self._azimuth = self.convert_to_iterable(input_value)
 
 class DownwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, theta: np.ndarray, phi: np.ndarray, ground_level: np.ndarray = 0.):
-        self.theta = theta
-        self.phi = phi
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
+        self.zenith = zenith
+        self.azimuth = azimuth
         self.ground_level = ground_level
 
     def create(self) -> MakeDownwardAxis:
         '''this method returns a dictionary element instantiated DownwardAxis
         class'''
-        object_list = np.empty((np.size(self.theta), np.size(self.phi)), dtype = 'O')
-        for i, t in enumerate(self.theta):
-            for j, p in enumerate(self.phi):
+        object_list = np.empty((np.size(self.zenith), np.size(self.azimuth)), dtype = 'O')
+        for i, t in enumerate(self.zenith):
+            for j, p in enumerate(self.azimuth):
                 object_list[i, j] = MakeDownwardAxis(t, p, self.ground_level)
         return object_list
 
@@ -83,17 +82,17 @@ class UpwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, theta: float, phi: float, ground_level: float = 0):
-        self.theta = theta
-        self.phi = phi
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
+        self.zenith = zenith
+        self.azimuth = azimuth
         self.ground_level = ground_level
 
     def create(self) -> MakeDownwardAxis:
         '''this method returns a dictionary element instantiated DownwardAxis
         class'''
-        object_list = np.empty((np.size(self.theta), np.size(self.phi)), dtype = 'O')
-        for i, t in enumerate(self.theta):
-            for j, p in enumerate(self.phi):
+        object_list = np.empty((np.size(self.zenith), np.size(self.azimuth)), dtype = 'O')
+        for i, t in enumerate(self.zenith):
+            for j, p in enumerate(self.azimuth):
                 object_list[i, j] = MakeUpwardAxis(t, p, self.ground_level)
         return object_list
 
@@ -123,19 +122,7 @@ class UserShower(Element):
         '''This method returns an instantiated user shower '''
         return self.convert_to_iterable(MakeUserShower(self.X, self.Nch))
 
-class OrbitalArray(Element):
-    '''This is the implementation of the orbital array element'''
-    element_type = 'counters'
-
-    def __init__(self, input_vectors: np.ndarray, input_area: float):
-        self.vectors = input_vectors
-        self.area = input_area
-
-    def create(self):
-        '''This method returns an instantiated orbital array'''
-        return self.convert_to_iterable(MakeOrbitalArray(self.vectors, self.area))
-
-class GroundArray(Element):
+class Counters(Element):
     '''This is the implementation of the ground array element'''
     element_type = 'counters'
 
@@ -145,7 +132,7 @@ class GroundArray(Element):
 
     def create(self):
         '''This method returns an instantiated orbital array'''
-        return self.convert_to_iterable(MakeGroundArray(self.vectors, self.area))
+        return self.convert_to_iterable(MakeCounters(self.vectors, self.area))
 
 class Yield(Element):
     '''This is the implementation of the yield element'''
@@ -173,7 +160,7 @@ class Signal:
         self.y = y #because "yield" is python boiler-plate
         self.t = self.shower.stage(axis.X)
         self.Nch = self.shower.profile(axis.X)
-        self.theta = self.counters.theta(axis)
+        self.theta = self.axis.theta(counters)
         self.omega = self.counters.omega(axis)
         # self.ng = self.calculate_ng()
         # self.ng_sum = self.ng.sum(axis = 1)
@@ -260,9 +247,9 @@ class ShowerSimulation:
                 for j in range(axis.shape[1]):
                     self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
                     if curved:
-                        self.times[i,j] = counters.get_timing_factory().get_curved_timing()(axis[i,j],counters)
+                        self.times[i,j] = axis[i,j].get_timing(counters)
                     else:
-                        self.times[i,j] = counters.get_timing_factory().get_timing()(axis[i,j],counters)
+                        self.times[i,j] = axis[i,j].get_curved_timing(counters)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -314,12 +301,12 @@ if __name__ == '__main__':
     counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
     counters[:,2] = np.full(100,z)
 
-    area = 0.03141593
+    area = 1
 
     sim = ShowerSimulation()
     sim.add(UpwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(OrbitalArray(counters, area))
+    sim.add(Counters(counters, area))
     sim.add(Yield(300,450))
     # sim.plot_profile()
     sim.run(curved = True)
