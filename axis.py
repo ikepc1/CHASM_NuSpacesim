@@ -159,7 +159,13 @@ class Axis(ABC):
         vectors toward each counter'''
 
     @abstractmethod
-    def get_timing_factory(self):
+    def get_timing(self):
+        '''This method should return the specific timing factory needed for
+        the specific axis type (up or down)
+        '''
+
+    @abstractmethod
+    def get_curved_timing(self):
         '''This method should return the specific timing factory needed for
         the specific axis type (up or down)
         '''
@@ -273,9 +279,13 @@ class MakeUpwardAxis(Axis):
         distance to the counter'''
         return np.pi - counters.calculate_theta(self)
 
-    def get_timing_factory(self):
-        '''This method returns the timing objects for upward going showers'''
-        return UpwardTimingFactory()
+    def get_timing(self, counters: MakeCounters):
+        '''This method returns the instantiated upward flat atm timing object'''
+        return UpwardTiming(self, counters)
+
+    def get_curved_timing(self, counters: MakeCounters):
+        '''This method returns the instantiated upward curved atm timing object'''
+        return UpwardTimingCurved(self, counters)
 
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
@@ -302,8 +312,16 @@ class MakeDownwardAxis(Axis):
         to the counter, in this case it's the internal angle'''
         return counters.calculate_theta(self)
 
-    def get_timing_factory(self):
-        return DownwardTimingFactory()
+    def get_timing(self, counters: MakeCounters):
+        '''This method returns the instantiated flat atm downward timing object
+        '''
+        return DownwardTiming(self, counters)
+
+    def get_curved_timing(self, counters: MakeCounters):
+        '''This method returns the instantiated curved atm downward timing
+        object
+        '''
+        return DownwardTimingCurved(self, counters)
 
 class Timing(ABC):
     '''This is the abstract base class which contains the methods needed for
@@ -544,36 +562,3 @@ class UpwardTimingCurved(Timing):
             test_delay = np.sum(vsd[i:] / (t1 + t2), axis = 1)
             delay[:,i] = np.interp(Q[:,i], test_Q, test_delay)
         return delay
-
-class TimingFactory(ABC):
-    '''This is the abstract base class for creating the timing factory'''
-
-    @abstractmethod
-    def get_timing(self):
-        '''This method gets the class which does flat atmosphere timing'''
-
-    @abstractmethod
-    def get_curved_timing(self):
-        '''This method gets the class which does curved atmosphere timing'''
-
-class DownwardTimingFactory(TimingFactory):
-    '''This is the implementation of the timing factory for downward-going
-    showers
-    '''
-
-    def get_timing(self):
-        return DownwardTiming
-
-    def get_curved_timing(self):
-        return DownwardTimingCurved
-
-class UpwardTimingFactory(TimingFactory):
-    '''This is the implementation of the timing factory for upward-going
-    showers
-    '''
-
-    def get_timing(self):
-        return UpwardTiming
-
-    def get_curved_timing(self):
-        return UpwardTimingCurved

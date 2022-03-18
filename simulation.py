@@ -247,9 +247,9 @@ class ShowerSimulation:
                 for j in range(axis.shape[1]):
                     self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
                     if curved:
-                        self.times[i,j] = axis[i,j].get_timing_factory().get_curved_timing()(axis[i,j],counters)
+                        self.times[i,j] = axis[i,j].get_timing(counters)
                     else:
-                        self.times[i,j] = axis[i,j].get_timing_factory().get_timing()(axis[i,j],counters)
+                        self.times[i,j] = axis[i,j].get_curved_timing(counters)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -301,7 +301,7 @@ if __name__ == '__main__':
     counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
     counters[:,2] = np.full(100,z)
 
-    area = 0.03141593
+    area = 1
 
     sim = ShowerSimulation()
     sim.add(UpwardAxis(theta,phi))
