@@ -1,7 +1,4 @@
 import numpy as np
-from counters import Counters
-from axis import Axis
-from shower import Shower
 from scipy.constants import value,nano
 from cherenkov_photon import CherenkovPhoton
 from cherenkov_photon_array import CherenkovPhotonArray

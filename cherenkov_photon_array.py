@@ -69,8 +69,10 @@ class CherenkovPhotonArray:
 
         gg4 = self.gg_t_delta_theta[jt:jt+2,jd:jd+2]
         gg2 = gg4[0]*(1-st) + gg4[1]*st
-        gg2[gg2 == 0] = 0.00001
+        zeromask = gg2 == 0
+        gg2[zeromask] = 1.e-8 #occasionally there will be some zeros in this array, we dont want to divide by zero
         gg  = gg2[0]*(gg2[1]/gg2[0])**sd
+        gg[zeromask.sum(axis=1)] = 0 #for the instances where there were zeros, the value of gg should be zero
         return gg
 
     def interpolate(self,t,delta,theta):
