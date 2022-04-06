@@ -153,7 +153,7 @@ class Signal:
     table_file = 'gg_t_delta_theta_doubled.npz'
     gga = CherenkovPhotonArray(table_file)
 
-    def __init__(self, shower: Shower, axis: Axis, counters: Counters, y: MakeYield):
+    def __init__(self, shower: Shower, axis: Axis, counters: MakeCounters, y: MakeYield):
         self.shower = shower
         self.axis = axis
         self.counters = counters
