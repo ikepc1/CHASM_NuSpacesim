@@ -171,9 +171,9 @@ class Axis(ABC):
         '''
 
 class MakeCounters:
-    '''This is the abstract base class containing the neccessary methods for
-    finding the vectors from a shower axis to a user defined array of Cherenkov
-    detectors with user defined size'''
+    '''This is the class containing the neccessary methods for finding the
+    vectors from a shower axis to a user defined array of Cherenkov detectors
+    with user defined size'''
 
     def __init__(self, input_vectors: np.ndarray, input_area: float):
         self.vectors = input_vectors
