@@ -23,9 +23,9 @@ class Axis(ABC):
     @zenith.setter
     def zenith(self, zenith):
         '''zenith angle property setter'''
-        if zenith > np.pi/2:
+        if zenith >= np.pi/2:
             raise ValueError('Zenith angle cannot be greater than pi / 2')
-        if zenith <= 0.:
+        if zenith < 0.:
             raise ValueError('Zenith angle cannot be less than 0')
         self._zenith = zenith
 
