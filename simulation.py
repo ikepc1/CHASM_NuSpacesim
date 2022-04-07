@@ -64,7 +64,7 @@ class DownwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0.):
         self.zenith = zenith
         self.azimuth = azimuth
         self.ground_level = ground_level
@@ -82,7 +82,7 @@ class UpwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0.):
         self.zenith = zenith
         self.azimuth = azimuth
         self.ground_level = ground_level
@@ -153,7 +153,8 @@ class Signal:
     table_file = 'gg_t_delta_theta_doubled.npz'
     gga = CherenkovPhotonArray(table_file)
 
-    def __init__(self, shower: Shower, axis: Axis, counters: MakeCounters, y: MakeYield):
+    def __init__(self, shower: Shower, axis: Axis, counters: MakeCounters, y: MakeYield,
+                att: Attenuation = NullAttenuation):
         self.shower = shower
         self.axis = axis
         self.counters = counters
