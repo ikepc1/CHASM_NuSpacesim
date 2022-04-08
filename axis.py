@@ -635,13 +635,13 @@ class Attenuation(ABC):
 
     @abstractmethod
     def fraction_lost(self) -> np.ndarray:
-        '''This method should return the fraction of light passed at each step
-        from axis to counters.
+        '''This method should return the fraction of light lost on its way from
+        each step to each counter.
         '''
 
     def fraction_passed(self) -> np.ndarray:
-        '''This method should return the fraction of light passed at each step
-        from axis to counters.
+        '''This method should return the fraction of light passed on its way from
+        each step to each counter.
         '''
         return 1. - self.fraction_lost()
 
