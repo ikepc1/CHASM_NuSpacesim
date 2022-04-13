@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.integrate import quad
+from scipy.constants import value
 
 class Atmosphere:
     """
     Class containing constants and methods for using the US Standard Atmosphere of 1976
-    
+
     The temperature is assumed to change linearly with height above sea level. From this
     and the assumption of hybrdostatic equilibrium the pressure and density are calculated.
 
@@ -20,10 +21,11 @@ class Atmosphere:
     gravity               = 9.80665   # m/s2
     gas_constant          = 8.31432   # J/MolK
     gMR           = gravity * air_mol_weight / gas_constant
+    avo = value('Avogadro')
 
     def __init__(self,altitudes=None,rel_pressure=None,temperatures=None,temp_gradient=None):
         """
-        Create and instance of an atmospheric model. 
+        Create and instance of an atmospheric model.
 
         If no parameters are provided, the US Standard Atmosphere is
         used. It uses these values
@@ -59,7 +61,7 @@ class Atmosphere:
     def atmosphere(self,h):
         """
         This function returns atmospheric temperature, pressure, and density as a function of height.
-        
+
         Parameters:
             h - height in atmosphere. This can be an ndarray or a single value. [m]
 
@@ -96,7 +98,7 @@ class Atmosphere:
         rel_pressure[~flat] = base_rel_pressure[~flat] * \
                               (base_temp[~flat]/temperature[~flat])**(self.gMR/1000/temp_gradient[~flat])
         pressure = rel_pressure * self.pressure_sea_level
-        density  = rel_pressure * self.density_sea_level * self.temperature_sea_level/temperature 
+        density  = rel_pressure * self.density_sea_level * self.temperature_sea_level/temperature
 
         temperature[too_low] = self.temperature_sea_level
         pressure[too_low]    = self.pressure_sea_level
@@ -104,7 +106,7 @@ class Atmosphere:
         temperature[too_high] = 0.
         pressure[too_high]    = 0.
         density[too_high]     = 0.
-        
+
         T = temperature
         P = pressure
         rho = density
@@ -117,7 +119,7 @@ class Atmosphere:
     def temperature(self,h):
         """
         This function returns temperature as a function of height.
-        
+
         Parameters:
             h - height in atmosphere. This can be an ndarray or a single value. [m]
 
@@ -130,7 +132,7 @@ class Atmosphere:
     def pressure(self,h):
         """
         This function returns pressure as a function of height.
-        
+
         Parameters:
             h - height in atmosphere. This can be an ndarray or a single value. [m]
 
@@ -139,11 +141,11 @@ class Atmosphere:
         """
         _,P,_ = self.atmosphere(h)
         return(P)
-    
+
     def density(self,h):
         """
         This function returns density as a function of height.
-        
+
         Parameters:
             h - height in atmosphere. This can be an ndarray or a single value. [m]
 
@@ -152,43 +154,56 @@ class Atmosphere:
         """
         _,_,rho = self.atmosphere(h)
         return(rho)
-    
+
+    def number_density(self,h):
+        '''
+        This method returns the approximate number density of air molecules as
+        a function of height.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            N - number density [N/m3]
+        '''
+        return self.density(h) * 1.e3 *  self.avo / self.air_mol_weight
+
     def delta(self,h):
         """
         This function returns the difference of the index-of-refraction from unity.
-        
+
         Parameters:
             h - height in atmosphere. This can be an ndarray or a single value. [m]
-        
+
         Returns:
             delta - equal to n - 1.
         """
         T,P,_ = self.atmosphere(h)
         P /= 1000.       # Pa -> kPa
         return 7.86e-4*P/T
-        
+
     def depth(self,h1,h2=None):
         """
         This function returns atmospheric depth. It is the integral of atmospheric density between two heights.
-        
+
         Parameters:
         These parameters can be ndarrays or single values.
-        
+
         h1 - height 1 in atmosphere. This can be an ndarray or a single value. [m]
         h2 - height 2; Default is hMaxAtm. This can be an ndarray or a single value [m]
-        
-        If both h1 and h2 are ndarrays, they must be the same size (the length 
+
+        If both h1 and h2 are ndarrays, they must be the same size (the length
         of the shorter array is used).
-        
+
         If h1 or h2 is greater than hMaxAtm, hMaxAtm is used.
-        
+
         Returns:
         The integral of rho from h1 to h2. The result is converted into g/cm2.
-        
+
         """
         if h2 is None:
             h2 = self.maximum_height*np.ones_like(h1)
-            
+
         if type(h1) is not np.ndarray and type(h2) is not np.ndarray:
             h1 = np.array([h1],dtype=float)
             h2 = np.array([h2],dtype=float)
@@ -220,21 +235,21 @@ class Atmosphere:
     def slant_depth(self,theta,d1,d2=None):
         """
         This function returns atmospheric depth as a function of the slant angle with respect to the vertical.
-        
+
         Parameters:
             theta - slant angle with respect to the vertical.This can be an ndarray or a single value. [rad]
             d1 - Distance along slant trajectory. This can be an ndarray or a single value. [m]
             d2 - Distance along slant trajectory. This can be an ndarray or a single value. [m]
-        
-        If both theta, d1, and d2 are all ndarrays, they must be the same size (the length 
+
+        If both theta, d1, and d2 are all ndarrays, they must be the same size (the length
         of the shortest array is used).
-        
+
         If d1 or d2 is are beyond the limits of the atmosphere, the limit of the atmosphere is used
 
         If d2 is not specified, the limit of the atmosphere is used.
 
         A flat-Earth model is assumed, so theta=pi/2 will give infinite results
-        
+
         Returns:
             The slant depth from d2 to d1 at angle theta. [g/cm2]
         """
@@ -292,7 +307,7 @@ class Atmosphere:
             return self.depth(h1,h2)/costheta[0]
         else:
             return self.depth(h1,h2)/costheta
-        
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     plt.ion()
@@ -314,5 +329,3 @@ if __name__ == '__main__':
     plt.xlim(h[0],h[-1])
     plt.grid()
     plt.legend()
-
-    
