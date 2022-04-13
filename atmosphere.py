@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.integrate import quad
-from scipy.constants import value
+from scipy.constants import Avogadro
 
 class Atmosphere:
     """
@@ -21,7 +21,7 @@ class Atmosphere:
     gravity               = 9.80665   # m/s2
     gas_constant          = 8.31432   # J/MolK
     gMR           = gravity * air_mol_weight / gas_constant
-    avo = value('Avogadro')
+    avo = Avogadro
 
     def __init__(self,altitudes=None,rel_pressure=None,temperatures=None,temp_gradient=None):
         """
