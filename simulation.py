@@ -166,10 +166,7 @@ class Signal:
         # self.ng_sum = self.ng.sum(axis = 1)
 
     def __repr__(self):
-        return f"Signal(shower=({self.shower.__repr__}), \
-                        axis=({self.axis.__repr__}), \
-                        counters=({self.counters.__repr__})), \
-                        yield=({self.y.__repr__}))"
+        return f"Signal({self.shower.__repr__()}, {self.axis.__repr__()}, {self.counters.__repr__()}, {self.y.__repr__()})"
 
     def calculate_gg(self):
         '''This funtion returns the interpolated values of gg at a given deltas
@@ -242,14 +239,17 @@ class ShowerSimulation:
         axis = self.ingredients['axis']
         self.signals = np.empty_like(self.ingredients['axis'])
         self.times = np.empty_like(self.ingredients['axis'])
+        self.attenuations = np.empty_like(self.ingredients['axis'])
         if self.check_ingredients():
             for i in range(axis.shape[0]):
                 for j in range(axis.shape[1]):
                     self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
                     if curved:
                         self.times[i,j] = axis[i,j].get_timing(counters)
+                        self.attenuations[i,j] = axis[i,j].get_attenuation(counters, y)
                     else:
                         self.times[i,j] = axis[i,j].get_curved_timing(counters)
+                        self.attenuations[i,j] = axis[i,j].get_curved_attenuation(counters, y)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -275,16 +275,31 @@ if __name__ == '__main__':
 
     # theta = np.linspace(.01, np.radians(80),100)
     # phi = np.linspace(0, 1.999*np.pi, 10)
-
-    # x = np.linspace(0,10000,11)
+    # theta = np.radians(60)
+    # phi = 0
+    #
+    # x = np.linspace(-1000,1000,100)
     # xx, yy = np.meshgrid(x,x)
     # counters = np.empty([xx.size,3])
     # counters[:,0] = xx.flatten()
     # counters[:,1] = yy.flatten()
     # counters[:,2] = np.zeros(xx.size)
-
-    # counters = np.zeros([30,3])
-    # counters[:,0] = np.logspace(-1,3,30)
+    #
+    # sim = ShowerSimulation()
+    # sim.add(DownwardAxis(theta,phi))
+    # sim.add(GHShower(666.,6e7,0.,70.))
+    # sim.add(Counters(counters, 1))
+    # sim.add(Yield(300,450))
+    # sim.run(curved = True)
+    #
+    # fig = plt.figure()
+    # h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_photon_sum(),bins=100, cmap=plt.cm.jet)
+    # # plt.title('Cherenkov Upward Shower footprint at ~500km')
+    # plt.xlabel('Counter Plane X-axis (km)')
+    # plt.ylabel('Counter Plane Y-axis (km)')
+    # ax = plt.gca()
+    # ax.set_aspect('equal')
+    # plt.colorbar(label = 'Number of Cherenkov Photons')
 
     counters = np.empty([100,3])
 
@@ -297,7 +312,6 @@ if __name__ == '__main__':
     z = r * np.cos(theta)
 
     counters[:,0] = np.full(100,x)
-    # counters[:,0] = np.linspace(-1000,1000,100)
     counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
     counters[:,2] = np.full(100,z)
 
@@ -308,5 +322,14 @@ if __name__ == '__main__':
     sim.add(GHShower(666.,6e7,0.,70.))
     sim.add(Counters(counters, area))
     sim.add(Yield(300,450))
-    # sim.plot_profile()
     sim.run(curved = True)
+
+    s = sim.signals[0,0]
+    ng = s.calculate_ng()
+    plt.figure()
+    plt.plot(s.counters.vectors[:,1],ng.sum(axis=1),label='no attenuation')
+    ng_att = ng * s.axis.get_attenuation(s.counters, s.y).fraction_passed()
+    ng_att_curved = ng * s.axis.get_curved_attenuation(s.counters, s.y).fraction_passed()
+    plt.plot(s.counters.vectors[:,1],ng_att.sum(axis=1), label='flat attenuation')
+    plt.plot(s.counters.vectors[:,1],ng_att_curved.sum(axis=1), label='curved attenuation')
+    plt.legend()

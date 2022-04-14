@@ -2,6 +2,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from atmosphere import Atmosphere
 from scipy.constants import value,nano
+from generate_Cherenkov import MakeYield
 
 class Axis(ABC):
     '''This is the abstract base class which contains the methods for computing
@@ -196,6 +197,9 @@ class MakeCounters:
         self.vectors = input_vectors
         self.area = input_area
 
+    def __repr__(self):
+        return f"Counters({self.vectors.shape[0]} counters with area = {self.area})"
+
     @property
     def vectors(self):
         '''Vectors to user defined Cherenkov counters getter'''
@@ -304,15 +308,15 @@ class MakeUpwardAxis(Axis):
         '''This method returns the instantiated upward curved atm timing object'''
         return UpwardTimingCurved(self, counters)
 
-    def get_attenuation(self, counters: MakeCounters):
+    def get_attenuation(self, counters: MakeCounters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
-        return UpwardAttenuation(self, counters)
+        return UpwardAttenuation(self, counters, y)
 
-    def get_curved_attenuation(self, counters: MakeCounters):
+    def get_curved_attenuation(self, counters: MakeCounters, y: MakeYield):
         '''This method returns the curved atmosphere attenuation object for upward
         axes'''
-        return UpwardAttenuationCurved(self, counters)
+        return UpwardAttenuationCurved(self, counters, y)
 
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
@@ -350,15 +354,15 @@ class MakeDownwardAxis(Axis):
         '''
         return DownwardTimingCurved(self, counters)
 
-    def get_attenuation(self, counters: MakeCounters):
+    def get_attenuation(self, counters: MakeCounters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
-        return DownwardAttenuation(self, counters)
+        return DownwardAttenuation(self, counters, y)
 
-    def get_curved_attenuation(self, counters: MakeCounters):
+    def get_curved_attenuation(self, counters: MakeCounters, y: MakeYield):
         '''This method returns the curved atmosphere attenuation object for downward
         axes'''
-        return DownwardAttenuationCurved(self, counters)
+        return DownwardAttenuationCurved(self, counters, y)
 
 def downward_curved_correction(axis: MakeDownwardAxis, counters: MakeCounters, vert: np.ndarray):
     '''This function divides some quantity specified at each atmospheric height
@@ -628,95 +632,138 @@ class Attenuation(ABC):
     calculate the fraction of light removed from the signal at each atmospheric
     step.
     '''
+    atm = Atmosphere()
 
-    def __init__(self, axis: Axis, counters: MakeCounters):
+    def __init__(self, axis: Axis, counters: MakeCounters, y: MakeYield):
         self.axis = axis
         self.counters = counters
+        self.y = y
+
+    def vertical_log_fraction(self) -> np.ndarray:
+        '''This method returns the natural log of the fraction of light which
+        survives each axis step if the light is travelling vertically.
+        '''
+        cs = self.rayleigh_cs(self.axis.h, self.y.l_mid)
+        N = self.atm.number_density(self.axis.h) / 1.e6 #convert to particles/cm^3
+        dh = self.axis.dh * 1.e2 #convert to cm
+        return -cs * N * dh
+
+    def nm_to_cm(self,l):
+        return l*nano*1.e2
+
+    def rayleigh_cs(self, h, l = 400.):
+        '''This method returns the Rayleigh scattering cross section as a
+        function of both the height in the atmosphere and the wavelength of
+        the scattered light. This does not include the King correction factor.
+
+        Parameters:
+        h - height (m) single value or np.ndarray
+        l - wavelength (nm) single value or np.ndarray
+
+        Returns:
+        sigma (cm^2 / particle)
+        '''
+        l_cm = self.nm_to_cm(l) #convert to cm
+        N = self.atm.number_density(h) / 1.e6 #convert to particles/cm^3
+        f1 = (24. * np.pi**3) / (N**2 * l_cm**4)
+        n = self.atm.delta(h) + 1
+        f2 = (n**2 - 1) / (n**2 + 2)
+        return f1 * f2**2
+
+    def fraction_passed(self):
+        '''This method returns the fraction of light originating at each
+        step on the axis which survives to reach each counter.
+
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
+        '''
+        return np.exp(self.log_fraction_passed())
 
     @abstractmethod
-    def fraction_lost(self) -> np.ndarray:
-        '''This method should return the fraction of light lost on its way from
-        each step to each counter.
-        '''
+    def log_fraction_passed(self) -> np.ndarray:
+        '''This method should return the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
 
-    def fraction_passed(self) -> np.ndarray:
-        '''This method should return the fraction of light passed on its way from
-        each step to each counter.
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
         '''
-        return 1. - self.fraction_lost()
 
 class DownwardAttenuation(Attenuation):
     '''This is the implementation of signal attenuation for an downward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
         self.axis = axis
         self.counters = counters
+        self.y = y
 
-    def vertical_att(self) -> np.ndarray:
-        '''This method returns the fraction of light lost from each axis step
-        by the time it reaches the counter IF the light is moving vertically.
-        '''
-        stage_loss = self.axis.density * 1.e-4
-        return np.cumsum(stage_loss)
+    def log_fraction_passed(self) -> np.ndarray:
+        '''This method returns the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
 
-    def fraction_lost(self) -> np.ndarray:
-        '''This method returns the fraction of light passed at each step from
-        axis to counters.
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
         '''
-        return self.vertical_att() / self.counters.cos_Q(self.axis)
+        return np.cumsum(self.vertical_log_fraction() / self.counters.cos_Q(self.axis), axis=1)
 
 class DownwardAttenuationCurved(Attenuation):
     '''This is the implementation of signal attenuation for an upward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
         self.axis = axis
         self.counters = counters
+        self.y = y
 
-    def fraction_lost(self) -> np.ndarray:
-        '''This method should return the fraction of light passed at each step
-        from axis to counters.
+    def log_fraction_passed(self):
+        '''This method returns the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
+
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
         '''
-        vert_frac = self.axis.density * 1.e-4
-        return downward_curved_correction(self.axis, self.counters, vert_frac)
+        return downward_curved_correction(self.axis, self.counters, self.vertical_log_fraction())
 
 class UpwardAttenuation(Attenuation):
     '''This is the implementation of signal attenuation for an upward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
         self.axis = axis
         self.counters = counters
+        self.y = y
 
-    def vertical_att(self) -> np.ndarray:
-        '''This method returns the fraction of light lost from each axis step
-        by the time it reaches the counter IF the light is moving vertically.
-        '''
-        stage_loss = self.axis.density * 1.e-4
-        return np.cumsum(stage_loss[::-1])[::-1]
-
-    def fraction_lost(self) -> np.ndarray:
+    def log_fraction_passed(self) -> np.ndarray:
         '''This method returns the fraction of light passed at each step from
         axis to counters.
+
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
         '''
-        return self.vertical_att() / self.counters.cos_Q(self.axis)
+        return np.cumsum((self.vertical_log_fraction() / self.counters.cos_Q(self.axis))[:,::-1], axis=1)[:,::-1]
 
 class UpwardAttenuationCurved(Attenuation):
     '''This is the implementation of signal attenuation for an upward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
         self.axis = axis
         self.counters = counters
+        self.y = y
 
-    def fraction_lost(self) -> np.ndarray:
-        '''This method should return the fraction of light passed at each step
-        from axis to counters.
+    def log_fraction_passed(self):
+        '''This method returns the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
+
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
         '''
-        vert_frac = self.axis.density * 1.e-4
-        return upward_curved_correction(self.axis, self.counters, vert_frac)
+        return upward_curved_correction(self.axis, self.counters, self.vertical_log_fraction())
