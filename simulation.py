@@ -245,11 +245,11 @@ class ShowerSimulation:
                 for j in range(axis.shape[1]):
                     self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
                     if curved:
-                        self.times[i,j] = axis[i,j].get_timing(counters)
-                        self.attenuations[i,j] = axis[i,j].get_attenuation(counters, y)
-                    else:
                         self.times[i,j] = axis[i,j].get_curved_timing(counters)
                         self.attenuations[i,j] = axis[i,j].get_curved_attenuation(counters, y)
+                    else:
+                        self.times[i,j] = axis[i,j].get_timing(counters)
+                        self.attenuations[i,j] = axis[i,j].get_attenuation(counters, y)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -267,6 +267,12 @@ class ShowerSimulation:
     def get_times(self, i=0, j=0):
         return self.times[i,j].counter_time()
 
+    def get_attenuated_photons(self, i=0, j=0):
+        return self.get_photons(i,j) * self.attenuations[i,j].fraction_passed()
+
+    def get_attenuated_photon_sum(self, i=0, j=0):
+        return self.get_attenuated_photons(i,j).sum(axis=1)
+
 
 if __name__ == '__main__':
     import numpy as np
@@ -275,61 +281,61 @@ if __name__ == '__main__':
 
     # theta = np.linspace(.01, np.radians(80),100)
     # phi = np.linspace(0, 1.999*np.pi, 10)
-    # theta = np.radians(60)
-    # phi = 0
-    #
-    # x = np.linspace(-1000,1000,100)
-    # xx, yy = np.meshgrid(x,x)
-    # counters = np.empty([xx.size,3])
-    # counters[:,0] = xx.flatten()
-    # counters[:,1] = yy.flatten()
-    # counters[:,2] = np.zeros(xx.size)
-    #
-    # sim = ShowerSimulation()
-    # sim.add(DownwardAxis(theta,phi))
-    # sim.add(GHShower(666.,6e7,0.,70.))
-    # sim.add(Counters(counters, 1))
-    # sim.add(Yield(300,450))
-    # sim.run(curved = True)
-    #
-    # fig = plt.figure()
-    # h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_photon_sum(),bins=100, cmap=plt.cm.jet)
-    # # plt.title('Cherenkov Upward Shower footprint at ~500km')
-    # plt.xlabel('Counter Plane X-axis (km)')
-    # plt.ylabel('Counter Plane Y-axis (km)')
-    # ax = plt.gca()
-    # ax.set_aspect('equal')
-    # plt.colorbar(label = 'Number of Cherenkov Photons')
+    theta = np.radians(60)
+    phi = 0
 
-    counters = np.empty([100,3])
-
-    theta = np.radians(85)
-    phi = 0.
-    r = 2141673.2772862054
-
-    x = r * np.sin(theta) * np.cos(phi)
-    y = r * np.sin(theta) * np.sin(phi)
-    z = r * np.cos(theta)
-
-    counters[:,0] = np.full(100,x)
-    counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
-    counters[:,2] = np.full(100,z)
-
-    area = 1
+    x = np.linspace(-1000,1000,100)
+    xx, yy = np.meshgrid(x,x)
+    counters = np.empty([xx.size,3])
+    counters[:,0] = xx.flatten()
+    counters[:,1] = yy.flatten()
+    counters[:,2] = np.zeros(xx.size)
 
     sim = ShowerSimulation()
-    sim.add(UpwardAxis(theta,phi))
+    sim.add(DownwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(Counters(counters, area))
+    sim.add(Counters(counters, 1))
     sim.add(Yield(300,450))
     sim.run(curved = True)
 
-    s = sim.signals[0,0]
-    ng = s.calculate_ng()
-    plt.figure()
-    plt.plot(s.counters.vectors[:,1],ng.sum(axis=1),label='no attenuation')
-    ng_att = ng * s.axis.get_attenuation(s.counters, s.y).fraction_passed()
-    ng_att_curved = ng * s.axis.get_curved_attenuation(s.counters, s.y).fraction_passed()
-    plt.plot(s.counters.vectors[:,1],ng_att.sum(axis=1), label='flat attenuation')
-    plt.plot(s.counters.vectors[:,1],ng_att_curved.sum(axis=1), label='curved attenuation')
-    plt.legend()
+    fig = plt.figure()
+    h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_photon_sum(),bins=100, cmap=plt.cm.jet)
+    # plt.title('Cherenkov Upward Shower footprint at ~500km')
+    plt.xlabel('Counter Plane X-axis (km)')
+    plt.ylabel('Counter Plane Y-axis (km)')
+    ax = plt.gca()
+    ax.set_aspect('equal')
+    plt.colorbar(label = 'Number of Cherenkov Photons')
+
+    # counters = np.empty([100,3])
+    #
+    # theta = np.radians(85)
+    # phi = 0.
+    # r = 2141673.2772862054
+    #
+    # x = r * np.sin(theta) * np.cos(phi)
+    # y = r * np.sin(theta) * np.sin(phi)
+    # z = r * np.cos(theta)
+    #
+    # counters[:,0] = np.full(100,x)
+    # counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
+    # counters[:,2] = np.full(100,z)
+    #
+    # area = 1
+    #
+    # sim = ShowerSimulation()
+    # sim.add(UpwardAxis(theta,phi))
+    # sim.add(GHShower(666.,6e7,0.,70.))
+    # sim.add(Counters(counters, area))
+    # sim.add(Yield(300,450))
+    # sim.run(curved = True)
+    #
+    # s = sim.signals[0,0]
+    # ng = s.calculate_ng()
+    # plt.figure()
+    # plt.plot(s.counters.vectors[:,1],ng.sum(axis=1),label='no attenuation')
+    # ng_att = ng * s.axis.get_attenuation(s.counters, s.y).fraction_passed()
+    # ng_att_curved = ng * s.axis.get_curved_attenuation(s.counters, s.y).fraction_passed()
+    # plt.plot(s.counters.vectors[:,1],ng_att.sum(axis=1), label='flat attenuation')
+    # plt.plot(s.counters.vectors[:,1],ng_att_curved.sum(axis=1), label='curved attenuation')
+    # plt.legend()
