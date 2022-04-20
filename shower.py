@@ -5,6 +5,8 @@ class Shower(ABC):
     '''This is the abstract class containing the needed methods for creating
     a shower profile
     '''
+    X0 = 0. #Default value for X0
+
     @property
     def X_max(self):
         '''X_max getter'''
@@ -13,8 +15,8 @@ class Shower(ABC):
     @X_max.setter
     def X_max(self, X_max):
         '''X_max property setter'''
-        if X_max <= 0.:
-            raise ValueError("Negative X_max")
+        if X_max <= self.X0:
+            raise ValueError("X_max cannot be less than X0")
         self._X_max = X_max
 
     @property
@@ -25,8 +27,8 @@ class Shower(ABC):
     @N_max.setter
     def N_max(self, N_max):
         '''N_max property setter'''
-        if not N_max.is_integer():
-            raise ValueError("Non integer N_max")
+        if N_max <= 0.:
+            raise ValueError("N_max must be positive")
         self._N_max = N_max
 
     @property
@@ -37,8 +39,6 @@ class Shower(ABC):
     @X0.setter
     def X0(self, X0):
         '''X0 property setter'''
-        if X0 < 0.:
-            raise ValueError("Negative X0")
         self._X0 = X0
 
     def stage(self, X, X0=36.62):
