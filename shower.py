@@ -5,7 +5,7 @@ class Shower(ABC):
     '''This is the abstract class containing the needed methods for creating
     a shower profile
     '''
-    X0 = 0. #Default value for X0
+    # X0 = 0. #Default value for X0
 
     @property
     def X_max(self):
@@ -15,8 +15,8 @@ class Shower(ABC):
     @X_max.setter
     def X_max(self, X_max):
         '''X_max property setter'''
-        if X_max <= self.X0:
-            raise ValueError("X_max cannot be less than X0")
+        # if X_max <= self.X0:
+        #     raise ValueError("X_max cannot be less than X0")
         self._X_max = X_max
 
     @property
