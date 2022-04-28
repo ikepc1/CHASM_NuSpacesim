@@ -246,6 +246,9 @@ class ShowerSimulation:
         return True
 
     def run(self, curved = False):
+        '''This is the proprietary run method which creates the arrays of
+        Signal, Timing, and Attenuation objects
+        '''
         shower = self.ingredients['shower'][0]
         counters = self.ingredients['counters'][0]
         y = self.ingredients['yield']
@@ -272,9 +275,22 @@ class ShowerSimulation:
         plt.plot(a.X, s.profile(a.X))
 
     def get_photons_array(self, i=0, j=0):
+        '''This method returns the array of photons going from each step to
+        each counter for each wavelength bin.
+
+        The returned array is of size:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
         return self.signals[i,j].calculate_ng()
 
     def get_photons(self, i=0, j=0):
+        '''This method returns the un-attenuated number of photons going from
+        each step to each counter.
+
+        The returned array is of size:
+        (# of counters, # of axis points)
+        '''
         photons_array = self.get_photons_array(i,j)
         total_photons = np.zeros_like(photons_array[0])
         for photons in photons_array:
@@ -282,12 +298,31 @@ class ShowerSimulation:
         return total_photons
 
     def get_photon_sum(self, i=0, j=0):
+        '''This method returns the un-attenuated total number of photons going
+        to each counter.
+
+        The returned array is of size:
+        (# of counters)
+        '''
         return self.get_photons(i,j).sum(axis=1)
 
     def get_times(self, i=0, j=0):
+        '''This method returns the time it takes after the shower starts along
+        the axis for each photon bin to hit each counter. It is simply calling
+        the get_times() method from a specific Timing object.
+
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
+        '''
         return self.times[i,j].counter_time()
 
     def get_attenuated_photons(self, i=0, j=0):
+        '''This method returns the attenuated number of photons going from each
+        step to each counter.
+
+        The returned array is of size:
+        (# of counters, # of axis points)
+        '''
         fraction_array = self.attenuations[i,j].fraction_passed()
         photons_array = self.get_photons_array(i,j)
         attenuated_photons = np.zeros_like(photons_array[0])
@@ -296,6 +331,12 @@ class ShowerSimulation:
         return attenuated_photons
 
     def get_attenuated_photon_sum(self, i=0, j=0):
+        '''This method returns the attenuated total number of photons going to
+        each counter.
+
+        The returned array is of size:
+        (# of counters)
+        '''
         return self.get_attenuated_photons(i,j).sum(axis=1)
 
 
