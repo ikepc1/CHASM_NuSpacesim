@@ -645,6 +645,10 @@ class Attenuation(ABC):
     def vertical_log_fraction(self) -> np.ndarray:
         '''This method returns the natural log of the fraction of light which
         survives each axis step if the light is travelling vertically.
+
+        The returned array is of size:
+        # of yield bins, with each entry being on size:
+        # of axis points
         '''
         log_fraction_array = np.empty_like(self.yield_array, dtype='O')
         N = self.atm.number_density(self.axis.h) / 1.e6
@@ -681,6 +685,7 @@ class Attenuation(ABC):
         step on the axis which survives to reach each counter.
 
         The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
         log_fraction_passed_array = self.log_fraction_passed()
@@ -696,6 +701,7 @@ class Attenuation(ABC):
         counter.
 
         The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
 
@@ -715,6 +721,7 @@ class DownwardAttenuation(Attenuation):
         counter.
 
         The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
@@ -740,6 +747,7 @@ class DownwardAttenuationCurved(Attenuation):
         counter.
 
         The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
@@ -763,6 +771,7 @@ class UpwardAttenuation(Attenuation):
         axis to counters.
 
         The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
@@ -788,6 +797,7 @@ class UpwardAttenuationCurved(Attenuation):
         counter.
 
         The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
