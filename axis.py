@@ -59,7 +59,7 @@ class Axis(ABC):
     @property
     def h(self):
         '''h property definition'''
-        return np.linspace(self.ground_level+1, self.atm.maximum_height, 1000)
+        return np.linspace(self.ground_level+1., self.atm.maximum_height, 1000)
 
     @property
     def dh(self):
@@ -92,7 +92,10 @@ class Axis(ABC):
         cos_EM = np.cos(np.pi-theta)
         R = cls.earth_radius
         r_CoE= h + R # distance from the center of the earth to the specified height
-        return R*cos_EM + np.sqrt(R**2*cos_EM**2-R**2+r_CoE**2)
+        rs = R*cos_EM + np.sqrt(R**2*cos_EM**2-R**2+r_CoE**2)
+        rs -= rs[0]
+        rs[0] = 1.
+        return rs # Need to find a better way to define axis zero point, currently they are all shifted by a meter to prevent divide by zero errors
 
     @property
     def r(self):
