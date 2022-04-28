@@ -142,9 +142,19 @@ class Yield(Element):
         self.l_min = l_min
         self.l_max = l_max
 
+    def make_lambda_bins(self, N=10):
+        '''This method creates a list of bin low edges and a list of bin high
+        edges'''
+        bin_edges = np.linspace(self.l_min, self.l_max, N+1)
+        return bin_edges[:-1], bin_edges[1:]
+
     def create(self):
         '''This method returns an instantiated yield object'''
-        return self.convert_to_iterable(MakeYield(self.l_min, self.l_max))
+        bin_minimums, bin_maximums = self.make_lambda_bins()
+        yield_array = np.empty_like(bin_minimums, dtype = 'O')
+        for i, (min, max) in enumerate(zip(bin_minimums, bin_maximums)):
+            yield_array[i] = MakeYield(min, max)
+        return yield_array
 
 class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
@@ -153,11 +163,11 @@ class Signal:
     table_file = 'gg_t_delta_theta_doubled.npz'
     gga = CherenkovPhotonArray(table_file)
 
-    def __init__(self, shower: Shower, axis: Axis, counters: Counters, y: MakeYield):
+    def __init__(self, shower: Shower, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.shower = shower
         self.axis = axis
         self.counters = counters
-        self.y = y #because "yield" is python boiler-plate
+        self.yield_array = yield_array
         self.t = self.shower.stage(axis.X)
         self.Nch = self.shower.profile(axis.X)
         self.theta = self.axis.theta(counters)
@@ -183,14 +193,14 @@ class Signal:
             gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
         return gg
 
-    def calculate_yield(self):
+    def calculate_yield(self, y: MakeYield):
         ''' This function returns the total number of Cherenkov photons emitted
         at a given stage of a shower per all solid angle.
 
         returns: the total number of photons per all solid angle
         size: (# of axis points)
         '''
-        Y = self.y.y_list(self.t, self.axis.delta)
+        Y = y.y_list(self.t, self.axis.delta)
         return self.Nch * self.axis.dr * Y
 
     def calculate_ng(self):
@@ -200,8 +210,11 @@ class Signal:
         The returned array is of size:
         (# of counters, # of axis points)
         '''
-        return self.calculate_gg() * self.calculate_yield() * self.omega
-
+        gg = self.calculate_gg()
+        ng_array = np.empty_like(self.yield_array, dtype='O')
+        for i, y in enumerate(self.yield_array):
+            ng_array[i] = gg * self.calculate_yield(y) * self.omega
+        return ng_array
 
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
@@ -235,7 +248,7 @@ class ShowerSimulation:
     def run(self, curved = False):
         shower = self.ingredients['shower'][0]
         counters = self.ingredients['counters'][0]
-        y = self.ingredients['yield'][0]
+        y = self.ingredients['yield']
         axis = self.ingredients['axis']
         self.signals = np.empty_like(self.ingredients['axis'])
         self.times = np.empty_like(self.ingredients['axis'])
@@ -258,8 +271,15 @@ class ShowerSimulation:
         plt.figure()
         plt.plot(a.X, s.profile(a.X))
 
-    def get_photons(self, i=0, j=0):
+    def get_photons_array(self, i=0, j=0):
         return self.signals[i,j].calculate_ng()
+
+    def get_photons(self, i=0, j=0):
+        photons_array = self.get_photons_array(i,j)
+        total_photons = np.zeros_like(photons_array[0])
+        for photons in photons_array:
+            total_photons += photons
+        return total_photons
 
     def get_photon_sum(self, i=0, j=0):
         return self.get_photons(i,j).sum(axis=1)
@@ -268,7 +288,12 @@ class ShowerSimulation:
         return self.times[i,j].counter_time()
 
     def get_attenuated_photons(self, i=0, j=0):
-        return self.get_photons(i,j) * self.attenuations[i,j].fraction_passed()
+        fraction_array = self.attenuations[i,j].fraction_passed()
+        photons_array = self.get_photons_array(i,j)
+        attenuated_photons = np.zeros_like(photons_array[0])
+        for photons, fractions in zip(photons_array, fraction_array):
+            attenuated_photons += photons * fractions
+        return attenuated_photons
 
     def get_attenuated_photon_sum(self, i=0, j=0):
         return self.get_attenuated_photons(i,j).sum(axis=1)

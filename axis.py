@@ -637,19 +637,22 @@ class Attenuation(ABC):
     '''
     atm = Atmosphere()
 
-    def __init__(self, axis: Axis, counters: MakeCounters, y: MakeYield):
+    def __init__(self, axis: Axis, counters: MakeCounters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
-        self.y = y
+        self.yield_array = yield_array
 
     def vertical_log_fraction(self) -> np.ndarray:
         '''This method returns the natural log of the fraction of light which
         survives each axis step if the light is travelling vertically.
         '''
-        cs = self.rayleigh_cs(self.axis.h, self.y.l_mid)
-        N = self.atm.number_density(self.axis.h) / 1.e6 #convert to particles/cm^3
-        dh = self.axis.dh * 1.e2 #convert to cm
-        return -cs * N * dh
+        log_fraction_array = np.empty_like(self.yield_array, dtype='O')
+        N = self.atm.number_density(self.axis.h) / 1.e6
+        dh = self.axis.dh * 1.e2
+        for i, y in enumerate(self.yield_array):
+            cs = self.rayleigh_cs(self.axis.h, y.l_mid)
+            log_fraction_array[i] = -cs * N * dh
+        return log_fraction_array
 
     def nm_to_cm(self,l):
         return l*nano*1.e2
@@ -680,7 +683,11 @@ class Attenuation(ABC):
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        return np.exp(self.log_fraction_passed())
+        log_fraction_passed_array = self.log_fraction_passed()
+        fraction_passed_array = np.empty_like(log_fraction_passed_array, dtype= 'O')
+        for i, lfp in enumerate(log_fraction_passed_array):
+            fraction_passed_array[i] = np.exp(lfp)
+        return fraction_passed_array
 
     @abstractmethod
     def log_fraction_passed(self) -> np.ndarray:
@@ -697,10 +704,10 @@ class DownwardAttenuation(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
-        self.y = y
+        self.yield_array = yield_array
 
     def log_fraction_passed(self) -> np.ndarray:
         '''This method returns the natural log of the fraction of light
@@ -710,17 +717,22 @@ class DownwardAttenuation(Attenuation):
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        return np.cumsum(self.vertical_log_fraction() / self.counters.cos_Q(self.axis), axis=1)
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
+        cQ = self.counters.cos_Q(self.axis)
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = np.cumsum(v_log_frac / cQ, axis=1)
+        return log_frac_passed_list
 
 class DownwardAttenuationCurved(Attenuation):
     '''This is the implementation of signal attenuation for an upward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
-        self.y = y
+        self.yield_array = yield_array
 
     def log_fraction_passed(self):
         '''This method returns the natural log of the fraction of light
@@ -730,17 +742,21 @@ class DownwardAttenuationCurved(Attenuation):
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        return downward_curved_correction(self.axis, self.counters, self.vertical_log_fraction())
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = downward_curved_correction(self.axis, self.counters, v_log_frac)
+        return log_frac_passed_list
 
 class UpwardAttenuation(Attenuation):
     '''This is the implementation of signal attenuation for an upward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
-        self.y = y
+        self.yield_array = yield_array
 
     def log_fraction_passed(self) -> np.ndarray:
         '''This method returns the fraction of light passed at each step from
@@ -749,17 +765,22 @@ class UpwardAttenuation(Attenuation):
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        return np.cumsum((self.vertical_log_fraction() / self.counters.cos_Q(self.axis))[:,::-1], axis=1)[:,::-1]
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
+        cQ = self.counters.cos_Q(self.axis)
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = np.cumsum((v_log_frac / cQ)[:,::-1], axis=1)[:,::-1]
+        return log_frac_passed_list
 
 class UpwardAttenuationCurved(Attenuation):
     '''This is the implementation of signal attenuation for an upward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, y: MakeYield):
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
-        self.y = y
+        self.yield_array = yield_array
 
     def log_fraction_passed(self):
         '''This method returns the natural log of the fraction of light
@@ -769,4 +790,8 @@ class UpwardAttenuationCurved(Attenuation):
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        return upward_curved_correction(self.axis, self.counters, self.vertical_log_fraction())
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = upward_curved_correction(self.axis, self.counters, v_log_frac)
+        return log_frac_passed_list
