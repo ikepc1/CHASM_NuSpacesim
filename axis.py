@@ -651,8 +651,8 @@ class Attenuation(ABC):
         # of axis points
         '''
         log_fraction_array = np.empty_like(self.yield_array, dtype='O')
-        N = self.atm.number_density(self.axis.h) / 1.e6
-        dh = self.axis.dh * 1.e2
+        N = self.atm.number_density(self.axis.h) / 1.e6 #convert to particles/cm^3
+        dh = self.axis.dh * 1.e2 #convert to cm
         for i, y in enumerate(self.yield_array):
             cs = self.rayleigh_cs(self.axis.h, y.l_mid)
             log_fraction_array[i] = -cs * N * dh
