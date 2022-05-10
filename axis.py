@@ -262,7 +262,7 @@ class Counters(ABC):
     def omega(self, axis: Axis):
         '''This method computes the solid angle of each counter as seen by
         each point on the axis'''
-        return self.area() / self.travel_length(axis)**2
+        return (self.area() / (self.travel_length(axis).T)**2).T
 
     def cos_Q(self, axis: Axis):
         '''This method returns the cosine of the angle between the z-axis and
@@ -285,10 +285,16 @@ class Counters(ABC):
 
 class MakeSphericalCounters(Counters):
     '''This is the implementation of the Counters abstract base class for
-    CORSIKA IACT style spherical detection volumes
+    CORSIKA IACT style spherical detection volumes.
+
+    Parameters:
+    input_vectors: rank 2 numpy array of shape (# of counters, 3) which is a
+    list of vectors (meters).
+    input_radius: Either a single value for an array of values corresponding to
+    the spherical radii of the detection volumes (meters).
     '''
 
-    def __init__(self, input_vectors: np.ndarray, input_radius: float):
+    def __init__(self, input_vectors: np.ndarray, input_radius: np.ndarray):
         self.vectors = input_vectors
         self.input_radius = input_radius
 
@@ -300,9 +306,12 @@ class MakeSphericalCounters(Counters):
     @input_radius.setter
     def input_radius(self, input_value):
         '''This is the input spherical radius setter.'''
-        if input_value <= 0.:
-            raise ValueError('Radius must be positive.')
-        self._input_radius = input_value
+        if type(input_value) != np.ndarray:
+            input_value = np.array(input_value)
+        if np.size(input_value) == np.shape(self.vectors)[0] or np.size(input_value) == 1:
+            self._input_radius = input_value
+        else:
+            raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
 
     def area(self):
         '''This is the implementation of the area method, which calculates the
