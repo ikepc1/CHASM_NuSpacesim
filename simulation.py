@@ -64,7 +64,7 @@ class DownwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0.):
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
         self.zenith = zenith
         self.azimuth = azimuth
         self.ground_level = ground_level
@@ -82,7 +82,7 @@ class UpwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0.):
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
         self.zenith = zenith
         self.azimuth = azimuth
         self.ground_level = ground_level
@@ -138,13 +138,24 @@ class Yield(Element):
     '''This is the implementation of the yield element'''
     element_type = 'yield'
 
-    def __init__(self, l_min: float, l_max: float):
+    def __init__(self, l_min: float, l_max: float, N_bins: int = 10):
         self.l_min = l_min
         self.l_max = l_max
+        self.N_bins = N_bins
+
+    def make_lambda_bins(self):
+        '''This method creates a list of bin low edges and a list of bin high
+        edges'''
+        bin_edges = np.linspace(self.l_min, self.l_max, self.N_bins+1)
+        return bin_edges[:-1], bin_edges[1:]
 
     def create(self):
         '''This method returns an instantiated yield object'''
-        return self.convert_to_iterable(MakeYield(self.l_min, self.l_max))
+        bin_minimums, bin_maximums = self.make_lambda_bins()
+        yield_array = np.empty_like(bin_minimums, dtype = 'O')
+        for i, (min, max) in enumerate(zip(bin_minimums, bin_maximums)):
+            yield_array[i] = MakeYield(min, max)
+        return yield_array
 
 class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
@@ -153,12 +164,11 @@ class Signal:
     table_file = 'gg_t_delta_theta_doubled.npz'
     gga = CherenkovPhotonArray(table_file)
 
-    def __init__(self, shower: Shower, axis: Axis, counters: MakeCounters, y: MakeYield,
-                att: Attenuation = NullAttenuation):
+    def __init__(self, shower: Shower, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.shower = shower
         self.axis = axis
         self.counters = counters
-        self.y = y #because "yield" is python boiler-plate
+        self.yield_array = yield_array
         self.t = self.shower.stage(axis.X)
         self.Nch = self.shower.profile(axis.X)
         self.theta = self.axis.theta(counters)
@@ -167,10 +177,7 @@ class Signal:
         # self.ng_sum = self.ng.sum(axis = 1)
 
     def __repr__(self):
-        return f"Signal(shower=({self.shower.__repr__}), \
-                        axis=({self.axis.__repr__}), \
-                        counters=({self.counters.__repr__})), \
-                        yield=({self.y.__repr__}))"
+        return f"Signal({self.shower.__repr__()}, {self.axis.__repr__()}, {self.counters.__repr__()}, {self.y.__repr__()})"
 
     def calculate_gg(self):
         '''This funtion returns the interpolated values of gg at a given deltas
@@ -187,14 +194,14 @@ class Signal:
             gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
         return gg
 
-    def calculate_yield(self):
+    def calculate_yield(self, y: MakeYield):
         ''' This function returns the total number of Cherenkov photons emitted
         at a given stage of a shower per all solid angle.
 
         returns: the total number of photons per all solid angle
         size: (# of axis points)
         '''
-        Y = self.y.y_list(self.t, self.axis.delta)
+        Y = y.y_list(self.t, self.axis.delta)
         return self.Nch * self.axis.dr * Y
 
     def calculate_ng(self):
@@ -204,8 +211,11 @@ class Signal:
         The returned array is of size:
         (# of counters, # of axis points)
         '''
-        return self.calculate_gg() * self.calculate_yield() * self.omega
-
+        gg = self.calculate_gg()
+        ng_array = np.empty_like(self.yield_array, dtype='O')
+        for i, y in enumerate(self.yield_array):
+            ng_array[i] = gg * self.calculate_yield(y) * self.omega
+        return ng_array
 
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
@@ -237,20 +247,26 @@ class ShowerSimulation:
         return True
 
     def run(self, curved = False):
+        '''This is the proprietary run method which creates the arrays of
+        Signal, Timing, and Attenuation objects
+        '''
         shower = self.ingredients['shower'][0]
         counters = self.ingredients['counters'][0]
-        y = self.ingredients['yield'][0]
+        y = self.ingredients['yield']
         axis = self.ingredients['axis']
         self.signals = np.empty_like(self.ingredients['axis'])
         self.times = np.empty_like(self.ingredients['axis'])
+        self.attenuations = np.empty_like(self.ingredients['axis'])
         if self.check_ingredients():
             for i in range(axis.shape[0]):
                 for j in range(axis.shape[1]):
                     self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
                     if curved:
-                        self.times[i,j] = axis[i,j].get_timing(counters)
-                    else:
                         self.times[i,j] = axis[i,j].get_curved_timing(counters)
+                        self.attenuations[i,j] = axis[i,j].get_curved_attenuation(counters, y)
+                    else:
+                        self.times[i,j] = axis[i,j].get_timing(counters)
+                        self.attenuations[i,j] = axis[i,j].get_attenuation(counters, y)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -259,14 +275,70 @@ class ShowerSimulation:
         plt.figure()
         plt.plot(a.X, s.profile(a.X))
 
-    def get_photons(self, i=0, j=0):
+    def get_photons_array(self, i=0, j=0):
+        '''This method returns the array of photons going from each step to
+        each counter for each wavelength bin.
+
+        The returned array is of size:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
         return self.signals[i,j].calculate_ng()
 
+    def get_photons(self, i=0, j=0):
+        '''This method returns the un-attenuated number of photons going from
+        each step to each counter.
+
+        The returned array is of size:
+        (# of counters, # of axis points)
+        '''
+        photons_array = self.get_photons_array(i,j)
+        total_photons = np.zeros_like(photons_array[0])
+        for photons in photons_array:
+            total_photons += photons
+        return total_photons
+
     def get_photon_sum(self, i=0, j=0):
+        '''This method returns the un-attenuated total number of photons going
+        to each counter.
+
+        The returned array is of size:
+        (# of counters)
+        '''
         return self.get_photons(i,j).sum(axis=1)
 
     def get_times(self, i=0, j=0):
+        '''This method returns the time it takes after the shower starts along
+        the axis for each photon bin to hit each counter. It is simply calling
+        the get_times() method from a specific Timing object.
+
+        The size of the returned array is of shape:
+        (# of counters, # of axis points)
+        '''
         return self.times[i,j].counter_time()
+
+    def get_attenuated_photons(self, i=0, j=0):
+        '''This method returns the attenuated number of photons going from each
+        step to each counter.
+
+        The returned array is of size:
+        (# of counters, # of axis points)
+        '''
+        fraction_array = self.attenuations[i,j].fraction_passed()
+        photons_array = self.get_photons_array(i,j)
+        attenuated_photons = np.zeros_like(photons_array[0])
+        for photons, fractions in zip(photons_array, fraction_array):
+            attenuated_photons += photons * fractions
+        return attenuated_photons
+
+    def get_attenuated_photon_sum(self, i=0, j=0):
+        '''This method returns the attenuated total number of photons going to
+        each counter.
+
+        The returned array is of size:
+        (# of counters)
+        '''
+        return self.get_attenuated_photons(i,j).sum(axis=1)
 
 
 if __name__ == '__main__':
@@ -276,38 +348,61 @@ if __name__ == '__main__':
 
     # theta = np.linspace(.01, np.radians(80),100)
     # phi = np.linspace(0, 1.999*np.pi, 10)
+    theta = np.radians(60)
+    phi = 0
 
-    # x = np.linspace(0,10000,11)
-    # xx, yy = np.meshgrid(x,x)
-    # counters = np.empty([xx.size,3])
-    # counters[:,0] = xx.flatten()
-    # counters[:,1] = yy.flatten()
-    # counters[:,2] = np.zeros(xx.size)
-
-    # counters = np.zeros([30,3])
-    # counters[:,0] = np.logspace(-1,3,30)
-
-    counters = np.empty([100,3])
-
-    theta = np.radians(85)
-    phi = 0.
-    r = 2141673.2772862054
-
-    x = r * np.sin(theta) * np.cos(phi)
-    y = r * np.sin(theta) * np.sin(phi)
-    z = r * np.cos(theta)
-
-    counters[:,0] = np.full(100,x)
-    # counters[:,0] = np.linspace(-1000,1000,100)
-    counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
-    counters[:,2] = np.full(100,z)
-
-    area = 1
+    x = np.linspace(-1000,1000,100)
+    xx, yy = np.meshgrid(x,x)
+    counters = np.empty([xx.size,3])
+    counters[:,0] = xx.flatten()
+    counters[:,1] = yy.flatten()
+    counters[:,2] = np.zeros(xx.size)
 
     sim = ShowerSimulation()
-    sim.add(UpwardAxis(theta,phi))
+    sim.add(DownwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(Counters(counters, area))
-    sim.add(Yield(300,450))
-    # sim.plot_profile()
-    sim.run(curved = True)
+    sim.add(Counters(counters, 1))
+    sim.add(Yield(200,205,1))
+    sim.run(curved = False)
+
+    fig = plt.figure()
+    h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_photon_sum(),bins=100, cmap=plt.cm.jet)
+    # plt.title('Cherenkov Upward Shower footprint at ~500km')
+    plt.xlabel('Counter Plane X-axis (km)')
+    plt.ylabel('Counter Plane Y-axis (km)')
+    ax = plt.gca()
+    ax.set_aspect('equal')
+    plt.colorbar(label = 'Number of Cherenkov Photons')
+
+    # counters = np.empty([100,3])
+    #
+    # theta = np.radians(85)
+    # phi = 0.
+    # r = 2141673.2772862054
+    #
+    # x = r * np.sin(theta) * np.cos(phi)
+    # y = r * np.sin(theta) * np.sin(phi)
+    # z = r * np.cos(theta)
+    #
+    # counters[:,0] = np.full(100,x)
+    # counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
+    # counters[:,2] = np.full(100,z)
+    #
+    # area = 1
+    #
+    # sim = ShowerSimulation()
+    # sim.add(UpwardAxis(theta,phi))
+    # sim.add(GHShower(666.,6e7,0.,70.))
+    # sim.add(Counters(counters, area))
+    # sim.add(Yield(300,450))
+    # sim.run(curved = True)
+    #
+    # s = sim.signals[0,0]
+    # ng = s.calculate_ng()
+    # plt.figure()
+    # plt.plot(s.counters.vectors[:,1],ng.sum(axis=1),label='no attenuation')
+    # ng_att = ng * s.axis.get_attenuation(s.counters, s.y).fraction_passed()
+    # ng_att_curved = ng * s.axis.get_curved_attenuation(s.counters, s.y).fraction_passed()
+    # plt.plot(s.counters.vectors[:,1],ng_att.sum(axis=1), label='flat attenuation')
+    # plt.plot(s.counters.vectors[:,1],ng_att_curved.sum(axis=1), label='curved attenuation')
+    # plt.legend()
