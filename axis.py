@@ -196,10 +196,6 @@ class Counters(ABC):
     vectors from a shower axis to a user defined array of Cherenkov detectors
     with user defined size'''
 
-    def __init__(self, input_vectors: np.ndarray, input_area: float):
-        self.vectors = input_vectors
-        self.input_area = input_area
-
     @property
     def vectors(self):
         '''Vectors to user defined Cherenkov counters getter'''
@@ -215,24 +211,12 @@ class Counters(ABC):
         self._vectors = input_vectors
 
     @property
-    def input_area(self):
-        '''Area of a counter's aperture getter'''
-        return self._input_area
-
-    @input_area.setter
-    def input_area(self, input_area: float):
-        '''Area of a counter's aperture setter'''
-        if input_area <= 0.:
-            raise ValueError('Counter area must be positive.')
-        self._input_area = input_area
-
-    @property
     def r(self):
         '''distance to each counter property definition'''
         return self.vector_magnitude(self.vectors)
 
     @abstractmethod
-    def area(self):
+    def area(self, axis: Axis):
         '''This is the abstract method for the detection surface area normal to
         the axis as seen from each point on the axis. Its shape must be
         broadcastable to the size of the travel_length array, i.e. either a
@@ -262,7 +246,7 @@ class Counters(ABC):
     def omega(self, axis: Axis):
         '''This method computes the solid angle of each counter as seen by
         each point on the axis'''
-        return (self.area() / (self.travel_length(axis).T)**2).T
+        return (self.area(axis) / (self.travel_length(axis).T)**2).T
 
     def cos_Q(self, axis: Axis):
         '''This method returns the cosine of the angle between the z-axis and
@@ -313,10 +297,40 @@ class MakeSphericalCounters(Counters):
         else:
             raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
 
-    def area(self):
+    def area(self, axis: Axis):
         '''This is the implementation of the area method, which calculates the
-        area of spherical counters as seen from the axis'''
+        area of spherical counters as seen from the axis
+        (In order to not have to write a unique omega() method for each Counters
+        implementation, I pass an Axis parameter which is ignored.)
+        '''
         return np.pi * self.input_radius**2
+
+class MakeFlatCounters(Counters):
+    '''This is the implementation of the Counters abstract base class for flat,
+    horizontal counting apertures.
+
+    Parameters:
+    input_vectors: rank 2 numpy array of shape (# of counters, 3) which is a
+    list of vectors (meters).
+    input_radius: Either a single value for an array of values corresponding to
+    the radii of the detection aperture (meters).'''
+    
+    def __init__(self, input_vectors: np.ndarray, input_radius: np.ndarray):
+        self.vectors = input_vectors
+        self.input_radius = input_radius
+
+    @property
+    def input_radius(self):
+        '''This is the input spherical radius getter.'''
+        return self._input_radius
+
+    @input_radius.setter
+    def input_radius(self, input_value):
+        '''This is the input spherical radius setter.'''
+        if type(input_value) != np.ndarray:
+            input_value = np.array(input_value)
+        if np.size(input_value) == np.shape(self.vectors)[0] or np.size(input_value) == 1:
+            self._input_radius = input_value
 
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
