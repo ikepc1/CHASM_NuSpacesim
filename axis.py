@@ -2,6 +2,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from atmosphere import Atmosphere
 from scipy.constants import value,nano
+from generate_Cherenkov import MakeYield
 
 class Axis(ABC):
     '''This is the abstract base class which contains the methods for computing
@@ -23,9 +24,9 @@ class Axis(ABC):
     @zenith.setter
     def zenith(self, zenith):
         '''zenith angle property setter'''
-        if zenith > np.pi/2:
+        if zenith >= np.pi/2:
             raise ValueError('Zenith angle cannot be greater than pi / 2')
-        if zenith <= 0.:
+        if zenith < 0.:
             raise ValueError('Zenith angle cannot be less than 0')
         self._zenith = zenith
 
@@ -58,7 +59,7 @@ class Axis(ABC):
     @property
     def h(self):
         '''h property definition'''
-        return np.linspace(self.ground_level+1, self.atm.maximum_height, 1000)
+        return np.linspace(self.ground_level+1., self.atm.maximum_height, 1000)
 
     @property
     def dh(self):
@@ -70,6 +71,11 @@ class Axis(ABC):
     def delta(self):
         '''delta property definition'''
         return self.atm.delta(self.h)
+
+    @property
+    def density(self):
+        '''Axis density property definition'''
+        return self.atm.density(self.h)
 
     @classmethod
     def h_to_axis_R_LOC(cls,h,theta):
@@ -86,7 +92,10 @@ class Axis(ABC):
         cos_EM = np.cos(np.pi-theta)
         R = cls.earth_radius
         r_CoE= h + R # distance from the center of the earth to the specified height
-        return R*cos_EM + np.sqrt(R**2*cos_EM**2-R**2+r_CoE**2)
+        rs = R*cos_EM + np.sqrt(R**2*cos_EM**2-R**2+r_CoE**2)
+        rs -= rs[0]
+        rs[0] = 1.
+        return rs # Need to find a better way to define axis zero point, currently they are all shifted by a meter to prevent divide by zero errors
 
     @property
     def r(self):
@@ -170,6 +179,18 @@ class Axis(ABC):
         the specific axis type (up or down)
         '''
 
+    @abstractmethod
+    def get_attenuation(self):
+        '''This method should return the specific attenuation factory needed for
+        the specific axis type (up or down)
+        '''
+
+    @abstractmethod
+    def get_curved_attenuation(self):
+        '''This method should return the specific timing factory needed for
+        the specific axis type (up or down)
+        '''
+
 class MakeCounters:
     '''This is the class containing the neccessary methods for finding the
     vectors from a shower axis to a user defined array of Cherenkov detectors
@@ -178,6 +199,9 @@ class MakeCounters:
     def __init__(self, input_vectors: np.ndarray, input_area: float):
         self.vectors = input_vectors
         self.area = input_area
+
+    def __repr__(self):
+        return f"Counters({self.vectors.shape[0]} counters with area = {self.area})"
 
     @property
     def vectors(self):
@@ -261,7 +285,7 @@ class MakeUpwardAxis(Axis):
 
     def __repr__(self):
         return "UpwardAxis(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
-        self.theta, self.phi, self.ground_level)
+        self.zenith, self.azimuth, self.ground_level)
 
     @property
     def X(self):
@@ -287,12 +311,22 @@ class MakeUpwardAxis(Axis):
         '''This method returns the instantiated upward curved atm timing object'''
         return UpwardTimingCurved(self, counters)
 
+    def get_attenuation(self, counters: MakeCounters, y: MakeYield):
+        '''This method returns the flat atmosphere attenuation object for upward
+        axes'''
+        return UpwardAttenuation(self, counters, y)
+
+    def get_curved_attenuation(self, counters: MakeCounters, y: MakeYield):
+        '''This method returns the curved atmosphere attenuation object for upward
+        axes'''
+        return UpwardAttenuationCurved(self, counters, y)
+
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
 
     def __repr__(self):
         return "DownwardAxis(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
-        self.theta, self.phi, self.ground_level)
+        self.zenith, self.azimuth, self.ground_level)
 
     @property
     def X(self):
@@ -322,6 +356,89 @@ class MakeDownwardAxis(Axis):
         object
         '''
         return DownwardTimingCurved(self, counters)
+
+    def get_attenuation(self, counters: MakeCounters, y: MakeYield):
+        '''This method returns the flat atmosphere attenuation object for downward
+        axes'''
+        return DownwardAttenuation(self, counters, y)
+
+    def get_curved_attenuation(self, counters: MakeCounters, y: MakeYield):
+        '''This method returns the curved atmosphere attenuation object for downward
+        axes'''
+        return DownwardAttenuationCurved(self, counters, y)
+
+def downward_curved_correction(axis: MakeDownwardAxis, counters: MakeCounters, vert: np.ndarray):
+    '''This function divides some quantity specified at each atmospheric height
+    by the approriate cosine (of the local angle between vertical in the
+    atmosphere and the counters), then sums those steps to the detector
+    elevation. This accounts for the curvature of the earth for shower axes
+    with high zenith angles. The calculation is sped up by using the cosine
+    sum identity as well as interpolation between the min and max angles.
+
+    Parameters:
+    axis: instantiated MakeUpwardAxis() object
+    counters: instantiated MakeCounters() object
+    vert: numpy array (same size as axis quantities) of some quantity related to
+    vertically travelling photons at that stage.
+
+    returns:
+    numpy array of the corrected and integrated vertical quantity at each axis
+    point going to each counter.
+    The shape is:
+    (# of counters, # of axis points)
+    '''
+    cQ = counters.cos_Q(axis)
+    integrals = np.empty_like(cQ)
+    Q = np.arccos(cQ)
+    sQ = np.sin(Q)
+    cQd = np.cos(axis.theta_difference)
+    sQd = np.sin(axis.theta_difference)
+    for i in range(integrals.shape[1]):
+        test_Q = np.linspace(Q[:,i].min(), Q[:,i].max(), 5)
+        test_cQ = np.cos(test_Q)
+        test_sQ = np.sin(test_Q)
+        t1 = test_cQ[:,np.newaxis] * cQd[:i] #these next three lines are what's different for up vs down
+        t2 = test_sQ[:,np.newaxis] * sQd[:i]
+        test_integrals = np.sum(vert[:i] / (t1 + t2), axis = 1)
+        integrals[:,i] = np.interp(Q[:,i], test_Q, test_integrals)
+    return integrals
+
+def upward_curved_correction(axis: MakeUpwardAxis, counters: MakeCounters, vert: np.ndarray):
+    '''This function divides some quantity specified at each atmospheric height
+    by the approriate cosine (of the local angle between vertical in the
+    atmosphere and the counters), then sums those steps to the top of the
+    atmosphere. This accounts for the curvature of the earth for shower axes
+    with high zenith angles. The calculation is sped up by using the cosine
+    sum identity as well as interpolation between the min and max angles.
+
+    Parameters:
+    axis: instantiated MakeUpwardAxis() object
+    counters: instantiated MakeCounters() object
+    vert: numpy array (same size as axis quantities) of some quantity related to
+    vertically travelling photons at that stage.
+
+    returns:
+    numpy array of the corrected and integrated vertical quantity at each axis
+    point going to each counter.
+    The shape is:
+    (# of counters, # of axis points)
+    '''
+    cQ = counters.cos_Q(axis)
+    integrals = np.empty_like(cQ)
+    Q = np.arccos(cQ)
+    sQ = np.sin(Q)
+    cQd = np.cos(axis.theta_difference)
+    sQd = np.sin(axis.theta_difference)
+    for i in range(integrals.shape[1]):
+        test_Q = np.linspace(Q[:,i].min(), Q[:,i].max(), 5)
+        test_cQ = np.cos(test_Q)
+        test_sQ = np.sin(test_Q)
+        t1 = test_cQ[:,np.newaxis] * cQd[i:] #these two lines are what's different for up vs down
+        t2 = test_sQ[:,np.newaxis] * sQd[i:]
+        test_integrals = np.sum(vert[i:] / (t1 + t2), axis = 1)
+        integrals[:,i] = np.interp(Q[:,i], test_Q, test_integrals)
+    return integrals
+
 
 class Timing(ABC):
     '''This is the abstract base class which contains the methods needed for
@@ -436,39 +553,13 @@ class DownwardTimingCurved(Timing):
         '''
         return self.axis.r[::-1] / self.c / nano
 
-    def delay(self) -> np.ndarray:
-        '''This is the implementation of the delay property for a downward
-        shower with a curved atmosphere
-
-        This function calculates the delay photons experience while propogating
-        through Earth's atmosphere. The calculation is sped up by using the cosine
-        sum identity as well as interpolation.
-
-        Parameters:
-        axis: instantiated Axis object
-        counters: instantiated Counters object
-
-        Returns:
-        The array of delays photon bunches would experience in the atmosphere. The
-        array is of shape:
-        (# of counters, # of axis points)
+    def delay(self):
+        '''This method returns the delay photons would experience when they
+        travel from a point on the axis to a counter. The returned array is of
+        shape: (# of counters, # of axis points)
         '''
-        cQ = self.counters.cos_Q(self.axis)
-        delay = np.empty_like(cQ)
-        Q = np.arccos(cQ)
-        sQ = np.sin(Q)
-        cQd = np.cos(self.axis.theta_difference)
-        sQd = np.sin(self.axis.theta_difference)
-        vsd = self.axis.delta * self.axis.dh /self.c/nano #vertical stage delay
-        for i in range(delay.shape[1]):
-            test_Q = np.linspace(Q[:,i].min(), Q[:,i].max(), 30)
-            test_cQ = np.cos(test_Q)
-            test_sQ = np.sin(test_Q)
-            t1 = test_cQ[:,np.newaxis] * cQd[:i] #these lines are what's different between downward and upward
-            t2 = test_sQ[:,np.newaxis] * sQd[:i]
-            test_delay = np.sum(vsd[:i] / (t1 + t2), axis = 1)
-            delay[:,i] = np.interp(Q[:,i], test_Q, test_delay)
-        return delay
+        vsd = self.axis.delta * self.axis.dh / self.c / nano #vertical stage delay
+        return downward_curved_correction(self.axis, self.counters, vsd)
 
 class UpwardTiming(Timing):
     '''This is the implementation of timing for a upward going shower with no
@@ -532,33 +623,185 @@ class UpwardTimingCurved(Timing):
         return self.axis.r / self.c / nano
 
     def delay(self):
+        '''This method returns the delay photons would experience when they
+        travel from a point on the axis to a counter. The returned array is of
+        shape: (# of counters, # of axis points)
         '''
-        This function calculates the delay photons experience while propogating
-        through Earth's atmosphere. The calculation is sped up by using the cosine
-        sum identity as well as interpolation.
+        vsd = self.axis.delta * self.axis.dh / self.c / nano #vertical stage delay
+        return upward_curved_correction(self.axis, self.counters, vsd)
+
+class Attenuation(ABC):
+    '''This is the abstract base class whose specific implementations will
+    calculate the fraction of light removed from the signal at each atmospheric
+    step.
+    '''
+    atm = Atmosphere()
+
+    def __init__(self, axis: Axis, counters: MakeCounters, yield_array: np.ndarray):
+        self.axis = axis
+        self.counters = counters
+        self.yield_array = yield_array
+
+    def vertical_log_fraction(self) -> np.ndarray:
+        '''This method returns the natural log of the fraction of light which
+        survives each axis step if the light is travelling vertically.
+
+        The returned array is of size:
+        # of yield bins, with each entry being on size:
+        # of axis points
+        '''
+        log_fraction_array = np.empty_like(self.yield_array, dtype='O')
+        N = self.atm.number_density(self.axis.h) / 1.e6 #convert to particles/cm^3
+        dh = self.axis.dh * 1.e2 #convert to cm
+        for i, y in enumerate(self.yield_array):
+            cs = self.rayleigh_cs(self.axis.h, y.l_mid)
+            log_fraction_array[i] = -cs * N * dh
+        return log_fraction_array
+
+    def nm_to_cm(self,l):
+        return l*nano*1.e2
+
+    def rayleigh_cs(self, h, l = 400.):
+        '''This method returns the Rayleigh scattering cross section as a
+        function of both the height in the atmosphere and the wavelength of
+        the scattered light. This does not include the King correction factor.
 
         Parameters:
-        axis: instantiated Axis object
-        counters: instantiated Counters object
+        h - height (m) single value or np.ndarray
+        l - wavelength (nm) single value or np.ndarray
 
         Returns:
-        The array of delays photon bunches would experience in the atmosphere. The
-        array is of shape:
+        sigma (cm^2 / particle)
+        '''
+        l_cm = self.nm_to_cm(l) #convert to cm
+        N = self.atm.number_density(h) / 1.e6 #convert to particles/cm^3
+        f1 = (24. * np.pi**3) / (N**2 * l_cm**4)
+        n = self.atm.delta(h) + 1
+        f2 = (n**2 - 1) / (n**2 + 2)
+        return f1 * f2**2
+
+    def fraction_passed(self):
+        '''This method returns the fraction of light originating at each
+        step on the axis which survives to reach each counter.
+
+        The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
+        log_fraction_passed_array = self.log_fraction_passed()
+        fraction_passed_array = np.empty_like(log_fraction_passed_array, dtype= 'O')
+        for i, lfp in enumerate(log_fraction_passed_array):
+            fraction_passed_array[i] = np.exp(lfp)
+        return fraction_passed_array
+
+    @abstractmethod
+    def log_fraction_passed(self) -> np.ndarray:
+        '''This method should return the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
+
+        The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
+
+class DownwardAttenuation(Attenuation):
+    '''This is the implementation of signal attenuation for an downward going air
+    shower with a flat atmosphere.
+    '''
+
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+        self.axis = axis
+        self.counters = counters
+        self.yield_array = yield_array
+
+    def log_fraction_passed(self) -> np.ndarray:
+        '''This method returns the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
+
+        The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
         cQ = self.counters.cos_Q(self.axis)
-        delay = np.empty_like(cQ)
-        Q = np.arccos(cQ)
-        sQ = np.sin(Q)
-        cQd = np.cos(self.axis.theta_difference)
-        sQd = np.sin(self.axis.theta_difference)
-        vsd = self.axis.delta * self.axis.dh / self.c / nano #vertical stage delay
-        for i in range(delay.shape[1]):
-            test_Q = np.linspace(Q[:,i].min(), Q[:,i].max(), 5)
-            test_cQ = np.cos(test_Q)
-            test_sQ = np.sin(test_Q)
-            t1 = test_cQ[:,np.newaxis] * cQd[i:]
-            t2 = test_sQ[:,np.newaxis] * sQd[i:]
-            test_delay = np.sum(vsd[i:] / (t1 + t2), axis = 1)
-            delay[:,i] = np.interp(Q[:,i], test_Q, test_delay)
-        return delay
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = np.cumsum(v_log_frac / cQ, axis=1)
+        return log_frac_passed_list
+
+class DownwardAttenuationCurved(Attenuation):
+    '''This is the implementation of signal attenuation for an upward going air
+    shower with a flat atmosphere.
+    '''
+
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+        self.axis = axis
+        self.counters = counters
+        self.yield_array = yield_array
+
+    def log_fraction_passed(self):
+        '''This method returns the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
+
+        The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = downward_curved_correction(self.axis, self.counters, v_log_frac)
+        return log_frac_passed_list
+
+class UpwardAttenuation(Attenuation):
+    '''This is the implementation of signal attenuation for an upward going air
+    shower with a flat atmosphere.
+    '''
+
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+        self.axis = axis
+        self.counters = counters
+        self.yield_array = yield_array
+
+    def log_fraction_passed(self) -> np.ndarray:
+        '''This method returns the fraction of light passed at each step from
+        axis to counters.
+
+        The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
+        cQ = self.counters.cos_Q(self.axis)
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = np.cumsum((v_log_frac / cQ)[:,::-1], axis=1)[:,::-1]
+        return log_frac_passed_list
+
+class UpwardAttenuationCurved(Attenuation):
+    '''This is the implementation of signal attenuation for an upward going air
+    shower with a flat atmosphere.
+    '''
+
+    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+        self.axis = axis
+        self.counters = counters
+        self.yield_array = yield_array
+
+    def log_fraction_passed(self):
+        '''This method returns the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
+
+        The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
+        vert_log_fraction_list = self.vertical_log_fraction()
+        log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
+        for i, v_log_frac in enumerate(vert_log_fraction_list):
+            log_frac_passed_list[i] = upward_curved_correction(self.axis, self.counters, v_log_frac)
+        return log_frac_passed_list

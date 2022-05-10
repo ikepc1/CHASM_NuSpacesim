@@ -8,9 +8,16 @@ class MakeYield:
 
     def __init__(self, l_min: float, l_max: float, npzfile = 'y_t_delta.npz'):
         y = np.load(npzfile)
+        self.l_min = l_min
+        self.l_max = l_max
+        self.l_mid = np.mean([l_min, l_max])
         self.y_delta_t = y['y_t_delta'] * self.lambda_interval(l_min, l_max)
         self.delta = y['d']
         self.t = y['t']
+
+    def __repr__(self):
+        return "Yield(l_min={:.2f} nm, l_max={:.2f} nm)".format(
+        self.l_min, self.l_max)
 
     def lambda_interval(self, l_min, l_max):
         '''This method returns the factor that results from integrating the
