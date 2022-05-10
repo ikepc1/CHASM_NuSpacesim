@@ -138,14 +138,15 @@ class Yield(Element):
     '''This is the implementation of the yield element'''
     element_type = 'yield'
 
-    def __init__(self, l_min: float, l_max: float):
+    def __init__(self, l_min: float, l_max: float, N_bins: int = 10):
         self.l_min = l_min
         self.l_max = l_max
+        self.N_bins = N_bins
 
-    def make_lambda_bins(self, N=10):
+    def make_lambda_bins(self):
         '''This method creates a list of bin low edges and a list of bin high
         edges'''
-        bin_edges = np.linspace(self.l_min, self.l_max, N+1)
+        bin_edges = np.linspace(self.l_min, self.l_max, self.N_bins+1)
         return bin_edges[:-1], bin_edges[1:]
 
     def create(self):
@@ -361,8 +362,8 @@ if __name__ == '__main__':
     sim.add(DownwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
     sim.add(Counters(counters, 1))
-    sim.add(Yield(300,450))
-    sim.run(curved = True)
+    sim.add(Yield(200,205,1))
+    sim.run(curved = False)
 
     fig = plt.figure()
     h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_photon_sum(),bins=100, cmap=plt.cm.jet)
