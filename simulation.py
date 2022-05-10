@@ -122,17 +122,17 @@ class UserShower(Element):
         '''This method returns an instantiated user shower '''
         return self.convert_to_iterable(MakeUserShower(self.X, self.Nch))
 
-class Counters(Element):
+class SphericalCounters(Element):
     '''This is the implementation of the ground array element'''
     element_type = 'counters'
 
-    def __init__(self, input_vectors: np.ndarray, input_area: float):
+    def __init__(self, input_vectors: np.ndarray, input_radius: float):
         self.vectors = input_vectors
-        self.area = input_area
+        self.radius = input_radius
 
     def create(self):
         '''This method returns an instantiated orbital array'''
-        return self.convert_to_iterable(MakeCounters(self.vectors, self.area))
+        return self.convert_to_iterable(MakeSphericalCounters(self.vectors, self.radius))
 
 class Yield(Element):
     '''This is the implementation of the yield element'''
@@ -361,7 +361,7 @@ if __name__ == '__main__':
     sim = ShowerSimulation()
     sim.add(DownwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(Counters(counters, 1))
+    sim.add(SphericalCounters(counters, 1))
     sim.add(Yield(200,205,1))
     sim.run(curved = False)
 
