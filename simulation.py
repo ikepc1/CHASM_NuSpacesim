@@ -134,6 +134,18 @@ class SphericalCounters(Element):
         '''This method returns an instantiated orbital array'''
         return self.convert_to_iterable(MakeSphericalCounters(self.vectors, self.radius))
 
+class FlatCounters(Element):
+    '''This is the implementation of the ground array element'''
+    element_type = 'counters'
+
+    def __init__(self, input_vectors: np.ndarray, input_radius: float):
+        self.vectors = input_vectors
+        self.radius = input_radius
+
+    def create(self):
+        '''This method returns an instantiated orbital array'''
+        return self.convert_to_iterable(MakeFlatCounters(self.vectors, self.radius))
+
 class Yield(Element):
     '''This is the implementation of the yield element'''
     element_type = 'yield'
@@ -361,7 +373,7 @@ if __name__ == '__main__':
     sim = ShowerSimulation()
     sim.add(DownwardAxis(theta,phi))
     sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(SphericalCounters(counters, 1))
+    sim.add(FlatCounters(counters, 1.))
     sim.add(Yield(200,205,1))
     sim.run(curved = False)
 
