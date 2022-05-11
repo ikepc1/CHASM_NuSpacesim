@@ -301,6 +301,10 @@ class MakeSphericalCounters(Counters):
     the spherical radii of the detection volumes (meters).
     '''
 
+    def __repr__(self):
+        return "SphericalCounters({:.2f} Counters with average area~ {:.2f})".format(
+        self.vectors.shape[0], self.area_normal().mean())
+
     def area(self):
         '''This is the implementation of the area method, which calculates the
         area of spherical counters as seen from the axis.
@@ -321,6 +325,10 @@ class MakeFlatCounters(Counters):
     list of vectors (meters).
     input_radius: Either a single value for an array of values corresponding to
     the radii of the detection aperture (meters).'''
+
+    def __repr__(self):
+        return "FlatCounters({:.2f} Counters with average area~ {:.2f})".format(
+        self.vectors.shape[0], self.area_normal().mean())
 
     def area(self, axis: Axis):
         '''This is the implementation of the area method for flat counting
