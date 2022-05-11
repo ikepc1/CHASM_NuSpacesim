@@ -191,17 +191,14 @@ class Axis(ABC):
         the specific axis type (up or down)
         '''
 
-class MakeCounters:
+class Counters(ABC):
     '''This is the class containing the neccessary methods for finding the
     vectors from a shower axis to a user defined array of Cherenkov detectors
     with user defined size'''
 
-    def __init__(self, input_vectors: np.ndarray, input_area: float):
+    def __init__(self, input_vectors: np.ndarray, input_radius: np.ndarray):
         self.vectors = input_vectors
-        self.area = input_area
-
-    def __repr__(self):
-        return f"Counters({self.vectors.shape[0]} counters with area = {self.area})"
+        self.input_radius = input_radius
 
     @property
     def vectors(self):
@@ -218,21 +215,40 @@ class MakeCounters:
         self._vectors = input_vectors
 
     @property
-    def area(self):
-        '''Area of a counter's aperture getter'''
-        return self._area
+    def input_radius(self):
+        '''This is the input counter radius getter.'''
+        return self._input_radius
 
-    @area.setter
-    def area(self, input_area: float):
-        '''Area of a counter's aperture setter'''
-        if input_area <= 0.:
-            raise ValueError('Counter area must be positive.')
-        self._area = input_area
+    @input_radius.setter
+    def input_radius(self, input_value):
+        '''This is the input counter radius setter.'''
+        if type(input_value) != np.ndarray:
+            input_value = np.array(input_value)
+        if np.size(input_value) == np.shape(self.vectors)[0] or np.size(input_value) == 1:
+            self._input_radius = input_value
+        else:
+            raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
 
     @property
     def r(self):
         '''distance to each counter property definition'''
         return self.vector_magnitude(self.vectors)
+
+    @abstractmethod
+    def area(self, *args, **kwargs):
+        '''This is the abstract method for the detection surface area normal to
+        the axis as seen from each point on the axis. Its shape must be
+        broadcastable to the size of the travel_length array, i.e. either a
+        single value or (# of counters, # of axis points)'''
+
+    @abstractmethod
+    def omega(self, *args, **kwargs):
+        '''This abstract method should compute the solid angle of each counter
+        as seen by each point on the axis'''
+
+    def area_normal(self):
+        '''This method returns the full area of the counting aperture.'''
+        return np.pi * self.input_radius**2
 
     def vector_magnitude(self, vectors: np.ndarray):
         '''This method computes the length of an array of vectors'''
@@ -255,11 +271,6 @@ class MakeCounters:
         each counter'''
         return self.vector_magnitude(self.travel_vectors(axis))
 
-    def omega(self, axis: Axis):
-        '''This method computes the solid angle of each counter as seen by
-        each point on the axis'''
-        return self.area / self.travel_length(axis)**2
-
     def cos_Q(self, axis: Axis):
         '''This method returns the cosine of the angle between the z-axis and
         the vector from the axis to the counter'''
@@ -278,6 +289,58 @@ class MakeCounters:
         axis_length = np.broadcast_to(axis.r, travel_length.shape)
         counter_length = np.broadcast_to(self.r, travel_length.T.shape).T
         return self.law_of_cosines(axis_length, travel_length, counter_length)
+
+class MakeSphericalCounters(Counters):
+    '''This is the implementation of the Counters abstract base class for
+    CORSIKA IACT style spherical detection volumes.
+
+    Parameters:
+    input_vectors: rank 2 numpy array of shape (# of counters, 3) which is a
+    list of vectors (meters).
+    input_radius: Either a single value for an array of values corresponding to
+    the spherical radii of the detection volumes (meters).
+    '''
+
+    def __repr__(self):
+        return "SphericalCounters({:.2f} Counters with average area~ {:.2f})".format(
+        self.vectors.shape[0], self.area_normal().mean())
+
+    def area(self):
+        '''This is the implementation of the area method, which calculates the
+        area of spherical counters as seen from the axis.
+        '''
+        return self.area_normal()
+
+    def omega(self, axis: Axis):
+        '''This method computes the solid angle of each counter as seen by
+        each point on the axis'''
+        return (self.area() / (self.travel_length(axis).T)**2).T
+
+class MakeFlatCounters(Counters):
+    '''This is the implementation of the Counters abstract base class for flat,
+    horizontal counting apertures.
+
+    Parameters:
+    input_vectors: rank 2 numpy array of shape (# of counters, 3) which is a
+    list of vectors (meters).
+    input_radius: Either a single value for an array of values corresponding to
+    the radii of the detection aperture (meters).'''
+
+    def __repr__(self):
+        return "FlatCounters({:.2f} Counters with average area~ {:.2f})".format(
+        self.vectors.shape[0], self.area_normal().mean())
+
+    def area(self, axis: Axis):
+        '''This is the implementation of the area method for flat counting
+        apertures. This method returns the area represented by each aperture as
+        seen by each point on the axis. The returned array is of size
+        (# of counters, # of axis points).'''
+        return (self.cos_Q(axis).T * self.area_normal()).T
+
+    def omega(self, axis: Axis):
+        '''This method computes the solid angle of each counter as seen by
+        each point on the axis'''
+        return self.area(axis) / (self.travel_length(axis)**2)
 
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
@@ -298,25 +361,25 @@ class MakeUpwardAxis(Axis):
         '''This method is the distance along the axis as a function of depth'''
         return np.interp(X, self.X, self.r)
 
-    def theta(self, counters: MakeCounters):
+    def theta(self, counters: Counters):
         '''In this case we need pi minus the interal angle across from the
         distance to the counter'''
         return np.pi - counters.calculate_theta(self)
 
-    def get_timing(self, counters: MakeCounters):
+    def get_timing(self, counters: Counters):
         '''This method returns the instantiated upward flat atm timing object'''
         return UpwardTiming(self, counters)
 
-    def get_curved_timing(self, counters: MakeCounters):
+    def get_curved_timing(self, counters: Counters):
         '''This method returns the instantiated upward curved atm timing object'''
         return UpwardTimingCurved(self, counters)
 
-    def get_attenuation(self, counters: MakeCounters, y: MakeYield):
+    def get_attenuation(self, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
         return UpwardAttenuation(self, counters, y)
 
-    def get_curved_attenuation(self, counters: MakeCounters, y: MakeYield):
+    def get_curved_attenuation(self, counters: Counters, y: MakeYield):
         '''This method returns the curved atmosphere attenuation object for upward
         axes'''
         return UpwardAttenuationCurved(self, counters, y)
@@ -341,33 +404,33 @@ class MakeDownwardAxis(Axis):
         '''This method is the distance along the axis as a function of depth'''
         return np.interp(X, self.X[::-1], self.r[::-1])
 
-    def theta(self, counters: MakeCounters):
+    def theta(self, counters: Counters):
         '''This method returns the angle between the axis and the vector going
         to the counter, in this case it's the internal angle'''
         return counters.calculate_theta(self)
 
-    def get_timing(self, counters: MakeCounters):
+    def get_timing(self, counters: Counters):
         '''This method returns the instantiated flat atm downward timing object
         '''
         return DownwardTiming(self, counters)
 
-    def get_curved_timing(self, counters: MakeCounters):
+    def get_curved_timing(self, counters: Counters):
         '''This method returns the instantiated curved atm downward timing
         object
         '''
         return DownwardTimingCurved(self, counters)
 
-    def get_attenuation(self, counters: MakeCounters, y: MakeYield):
+    def get_attenuation(self, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
         return DownwardAttenuation(self, counters, y)
 
-    def get_curved_attenuation(self, counters: MakeCounters, y: MakeYield):
+    def get_curved_attenuation(self, counters: Counters, y: MakeYield):
         '''This method returns the curved atmosphere attenuation object for downward
         axes'''
         return DownwardAttenuationCurved(self, counters, y)
 
-def downward_curved_correction(axis: MakeDownwardAxis, counters: MakeCounters, vert: np.ndarray):
+def downward_curved_correction(axis: MakeDownwardAxis, counters: Counters, vert: np.ndarray):
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the detector
@@ -377,7 +440,7 @@ def downward_curved_correction(axis: MakeDownwardAxis, counters: MakeCounters, v
 
     Parameters:
     axis: instantiated MakeUpwardAxis() object
-    counters: instantiated MakeCounters() object
+    counters: instantiated Counters() object
     vert: numpy array (same size as axis quantities) of some quantity related to
     vertically travelling photons at that stage.
 
@@ -403,7 +466,7 @@ def downward_curved_correction(axis: MakeDownwardAxis, counters: MakeCounters, v
         integrals[:,i] = np.interp(Q[:,i], test_Q, test_integrals)
     return integrals
 
-def upward_curved_correction(axis: MakeUpwardAxis, counters: MakeCounters, vert: np.ndarray):
+def upward_curved_correction(axis: MakeUpwardAxis, counters: Counters, vert: np.ndarray):
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the top of the
@@ -413,7 +476,7 @@ def upward_curved_correction(axis: MakeUpwardAxis, counters: MakeCounters, vert:
 
     Parameters:
     axis: instantiated MakeUpwardAxis() object
-    counters: instantiated MakeCounters() object
+    counters: instantiated Counters() object
     vert: numpy array (same size as axis quantities) of some quantity related to
     vertically travelling photons at that stage.
 
@@ -447,7 +510,7 @@ class Timing(ABC):
     '''
     c = value('speed of light in vacuum')
 
-    def __init__(self, axis: Axis, counters: MakeCounters):
+    def __init__(self, axis: Axis, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -497,7 +560,7 @@ class DownwardTiming(Timing):
     correction for atmospheric curveature
     '''
 
-    def __init__(self, axis: MakeDownwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeDownwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -533,7 +596,7 @@ class DownwardTimingCurved(Timing):
     athmosphere, this will be useful for showers with a relatively high zenith
     angle'''
 
-    def __init__(self, axis: MakeDownwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeDownwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -566,7 +629,7 @@ class UpwardTiming(Timing):
     correction for atmospheric curveature
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -602,7 +665,7 @@ class UpwardTimingCurved(Timing):
     correction for atmospheric curveature.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters):
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -637,7 +700,7 @@ class Attenuation(ABC):
     '''
     atm = Atmosphere()
 
-    def __init__(self, axis: Axis, counters: MakeCounters, yield_array: np.ndarray):
+    def __init__(self, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
@@ -710,7 +773,7 @@ class DownwardAttenuation(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
@@ -736,7 +799,7 @@ class DownwardAttenuationCurved(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
@@ -761,7 +824,7 @@ class UpwardAttenuation(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
@@ -786,7 +849,7 @@ class UpwardAttenuationCurved(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: MakeCounters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
