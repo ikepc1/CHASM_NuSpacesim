@@ -64,36 +64,44 @@ class DownwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0, curved: bool = False):
         self.zenith = zenith
         self.azimuth = azimuth
         self.ground_level = ground_level
+        self.curved = curved
 
-    def create(self) -> MakeDownwardAxis:
+    def create(self) -> np.ndarray:
         '''this method returns a dictionary element instantiated DownwardAxis
         class'''
         object_list = np.empty((np.size(self.zenith), np.size(self.azimuth)), dtype = 'O')
         for i, t in enumerate(self.zenith):
             for j, p in enumerate(self.azimuth):
-                object_list[i, j] = MakeDownwardAxis(t, p, self.ground_level)
+                if self.curved:
+                    object_list[i, j] = MakeDownwardAxisCurvedAtm(t, p, self.ground_level)
+                else:
+                    object_list[i, j] = MakeDownwardAxisFlatPlanarAtm(t, p, self.ground_level)
         return object_list
 
 class UpwardAxis(AxisElement):
     '''This is the implementation of the downward axis element'''
     element_type = 'axis'
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0):
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0, curved: bool = False):
         self.zenith = zenith
         self.azimuth = azimuth
         self.ground_level = ground_level
+        self.curved = curved
 
-    def create(self) -> MakeDownwardAxis:
+    def create(self) -> np.ndarray:
         '''this method returns a dictionary element instantiated DownwardAxis
         class'''
         object_list = np.empty((np.size(self.zenith), np.size(self.azimuth)), dtype = 'O')
         for i, t in enumerate(self.zenith):
             for j, p in enumerate(self.azimuth):
-                object_list[i, j] = MakeUpwardAxis(t, p, self.ground_level)
+                if self.curved:
+                    object_list[i, j] = MakeUpwardAxisCurvedAtm(t, p, self.ground_level)
+                else:
+                    object_list[i, j] = MakeUpwardAxisFlatPlanarAtm(t, p, self.ground_level)
         return object_list
 
 class GHShower(Element):
@@ -258,7 +266,7 @@ class ShowerSimulation:
                 return False
         return True
 
-    def run(self, curved = False):
+    def run(self):
         '''This is the proprietary run method which creates the arrays of
         Signal, Timing, and Attenuation objects
         '''
@@ -273,12 +281,8 @@ class ShowerSimulation:
             for i in range(axis.shape[0]):
                 for j in range(axis.shape[1]):
                     self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
-                    if curved:
-                        self.times[i,j] = axis[i,j].get_curved_timing(counters)
-                        self.attenuations[i,j] = axis[i,j].get_curved_attenuation(counters, y)
-                    else:
-                        self.times[i,j] = axis[i,j].get_timing(counters)
-                        self.attenuations[i,j] = axis[i,j].get_attenuation(counters, y)
+                    self.times[i,j] = axis[i,j].get_timing(counters)
+                    self.attenuations[i,j] = axis[i,j].get_attenuation(counters, y)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -375,7 +379,7 @@ if __name__ == '__main__':
     sim.add(GHShower(666.,6e7,0.,70.))
     sim.add(FlatCounters(counters, 1.))
     sim.add(Yield(200,205,1))
-    sim.run(curved = False)
+    sim.run()
 
     fig = plt.figure()
     h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_photon_sum(),bins=100, cmap=plt.cm.jet)

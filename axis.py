@@ -97,11 +97,6 @@ class Axis(ABC):
         rs[0] = 1.
         return rs # Need to find a better way to define axis zero point, currently they are all shifted by a meter to prevent divide by zero errors
 
-    @property
-    def r(self):
-        '''r property definition'''
-        return self.h_to_axis_R_LOC(self.h, self.zenith)
-
     @classmethod
     def theta_normal(cls,h,r):
         '''This method calculates the angle the axis makes with respect to
@@ -155,6 +150,12 @@ class Axis(ABC):
 
     @property
     @abstractmethod
+    def r(self):
+        '''r property definition'''
+        # return self.h_to_axis_R_LOC(self.h, self.zenith)
+
+    @property
+    @abstractmethod
     def X(self):
         '''This method sets the depth along the shower axis attribute'''
 
@@ -174,20 +175,8 @@ class Axis(ABC):
         '''
 
     @abstractmethod
-    def get_curved_timing(self):
-        '''This method should return the specific timing factory needed for
-        the specific axis type (up or down)
-        '''
-
-    @abstractmethod
     def get_attenuation(self):
         '''This method should return the specific attenuation factory needed for
-        the specific axis type (up or down)
-        '''
-
-    @abstractmethod
-    def get_curved_attenuation(self):
-        '''This method should return the specific timing factory needed for
         the specific axis type (up or down)
         '''
 
@@ -343,13 +332,20 @@ class MakeFlatCounters(Counters):
         (# of counters, # of axis points)'''
         return self.area(axis) / (self.travel_length(axis)**2)
 
+# class FlatPlanarAtmAxis(Axis):
+    # @property
+    # def r(self):
+    #     return self.h / np.cos(self.zenith)
+#
+# class CurvedAtmAxis(Axis):
+#     @property
+#     def r(self):
+#         '''r property definition'''
+#         return self.h_to_axis_R_LOC(self.h, self.zenith)
+
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
     are added along the axis in the upward direction'''
-
-    def __repr__(self):
-        return "UpwardAxis(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
-        self.zenith, self.azimuth, self.ground_level)
 
     @property
     def X(self):
@@ -367,30 +363,52 @@ class MakeUpwardAxis(Axis):
         distance to the counter'''
         return np.pi - counters.calculate_theta(self)
 
+class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
+    '''This is the implementation of an upward going shower axis with a flat
+    planar atmosphere'''
+
+    def __repr__(self):
+        return "UpwardAxisFlatPlanarAtm(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+                                        self.zenith, self.azimuth, self.ground_level)
+
+    @property
+    def r(self):
+        '''This is the axis distance property definition'''
+        return self.h / np.cos(self.zenith)
+
     def get_timing(self, counters: Counters):
         '''This method returns the instantiated upward flat atm timing object'''
         return UpwardTiming(self, counters)
-
-    def get_curved_timing(self, counters: Counters):
-        '''This method returns the instantiated upward curved atm timing object'''
-        return UpwardTimingCurved(self, counters)
 
     def get_attenuation(self, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
         return UpwardAttenuation(self, counters, y)
 
-    def get_curved_attenuation(self, counters: Counters, y: MakeYield):
-        '''This method returns the curved atmosphere attenuation object for upward
+class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
+    '''This is the implementation of an upward going shower axis with a flat
+    planar atmosphere'''
+
+    def __repr__(self):
+        return "UpwardAxisCurvedAtm(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+                                        self.zenith, self.azimuth, self.ground_level)
+
+    @property
+    def r(self):
+        '''This is the axis distance property definition'''
+        return self.h_to_axis_R_LOC(self.h, self.zenith)
+
+    def get_timing(self, counters: Counters):
+        '''This method returns the instantiated upward flat atm timing object'''
+        return UpwardTimingCurved(self, counters)
+
+    def get_attenuation(self, counters: Counters, y: MakeYield):
+        '''This method returns the flat atmosphere attenuation object for upward
         axes'''
         return UpwardAttenuationCurved(self, counters, y)
 
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
-
-    def __repr__(self):
-        return "DownwardAxis(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
-        self.zenith, self.azimuth, self.ground_level)
 
     @property
     def X(self):
@@ -410,28 +428,53 @@ class MakeDownwardAxis(Axis):
         to the counter, in this case it's the internal angle'''
         return counters.calculate_theta(self)
 
+class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
+    '''This is the implementation of a downward going shower axis with a flat
+    planar atmosphere.'''
+
+    def __repr__(self):
+        return "DownwardAxisFlatPlanarAtm(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        self.zenith, self.azimuth, self.ground_level)
+
+    @property
+    def r(self):
+        '''This is the axis distance property definition'''
+        return self.h / np.cos(self.zenith)
+
     def get_timing(self, counters: Counters):
         '''This method returns the instantiated flat atm downward timing object
         '''
         return DownwardTiming(self, counters)
-
-    def get_curved_timing(self, counters: Counters):
-        '''This method returns the instantiated curved atm downward timing
-        object
-        '''
-        return DownwardTimingCurved(self, counters)
 
     def get_attenuation(self, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
         return DownwardAttenuation(self, counters, y)
 
-    def get_curved_attenuation(self, counters: Counters, y: MakeYield):
-        '''This method returns the curved atmosphere attenuation object for downward
+class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
+    '''This is the implementation of a downward going shower axis with a
+    curved atmosphere.'''
+
+    def __repr__(self):
+        return "DownwardAxisCurvedAtm(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        self.zenith, self.azimuth, self.ground_level)
+
+    @property
+    def r(self):
+        '''This is the axis distance property definition'''
+        return self.h_to_axis_R_LOC(self.h, self.zenith)
+
+    def get_timing(self, counters: Counters):
+        '''This method returns the instantiated flat atm downward timing object
+        '''
+        return DownwardTimingCurved(self, counters)
+
+    def get_attenuation(self, counters: Counters, y: MakeYield):
+        '''This method returns the flat atmosphere attenuation object for downward
         axes'''
         return DownwardAttenuationCurved(self, counters, y)
 
-def downward_curved_correction(axis: MakeDownwardAxis, counters: Counters, vert: np.ndarray):
+def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the detector
@@ -467,7 +510,7 @@ def downward_curved_correction(axis: MakeDownwardAxis, counters: Counters, vert:
         integrals[:,i] = np.interp(Q[:,i], test_Q, test_integrals)
     return integrals
 
-def upward_curved_correction(axis: MakeUpwardAxis, counters: Counters, vert: np.ndarray):
+def upward_curved_correction(axis: MakeUpwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the top of the
@@ -561,7 +604,7 @@ class DownwardTiming(Timing):
     correction for atmospheric curveature
     '''
 
-    def __init__(self, axis: MakeDownwardAxis, counters: Counters):
+    def __init__(self, axis: MakeDownwardAxisFlatPlanarAtm, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -597,7 +640,7 @@ class DownwardTimingCurved(Timing):
     athmosphere, this will be useful for showers with a relatively high zenith
     angle'''
 
-    def __init__(self, axis: MakeDownwardAxis, counters: Counters):
+    def __init__(self, axis: MakeDownwardAxisCurvedAtm, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -630,7 +673,7 @@ class UpwardTiming(Timing):
     correction for atmospheric curveature
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: Counters):
+    def __init__(self, axis: MakeUpwardAxisFlatPlanarAtm, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -666,7 +709,7 @@ class UpwardTimingCurved(Timing):
     correction for atmospheric curveature.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: Counters):
+    def __init__(self, axis: MakeUpwardAxisCurvedAtm, counters: Counters):
         self.axis = axis
         self.counters = counters
         # self.counter_time = self.counter_time()
@@ -795,7 +838,7 @@ class DownwardAttenuation(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeDownwardAxisFlatPlanarAtm, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
@@ -821,7 +864,7 @@ class DownwardAttenuationCurved(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeDownwardAxisCurvedAtm, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
@@ -846,7 +889,7 @@ class UpwardAttenuation(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeUpwardAxisFlatPlanarAtm, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
@@ -871,7 +914,7 @@ class UpwardAttenuationCurved(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxis, counters: Counters, yield_array: np.ndarray):
+    def __init__(self, axis: MakeUpwardAxisCurvedAtm, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
