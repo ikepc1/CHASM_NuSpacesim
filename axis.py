@@ -339,7 +339,8 @@ class MakeFlatCounters(Counters):
 
     def omega(self, axis: Axis):
         '''This method computes the solid angle of each counter as seen by
-        each point on the axis'''
+        each point on the axis
+        (# of counters, # of axis points)'''
         return self.area(axis) / (self.travel_length(axis)**2)
 
 class MakeUpwardAxis(Axis):
@@ -699,11 +700,31 @@ class Attenuation(ABC):
     step.
     '''
     atm = Atmosphere()
+    abstable = np.load('abstable.npz')
+    ecoeff = abstable['ecoeff']
+    l_list = abstable['wavelength']
+    h_list = abstable['height']
 
     def __init__(self, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
+
+    # def vertical_log_fraction(self) -> np.ndarray:
+    #     '''This method returns the natural log of the fraction of light which
+    #     survives each axis step if the light is travelling vertically.
+    #
+    #     The returned array is of size:
+    #     # of yield bins, with each entry being on size:
+    #     # of axis points
+    #     '''
+    #     log_fraction_array = np.empty_like(self.yield_array, dtype='O')
+    #     N = self.atm.number_density(self.axis.h) / 1.e6 #convert to particles/cm^3
+    #     dh = self.axis.dh * 1.e2 #convert to cm
+    #     for i, y in enumerate(self.yield_array):
+    #         cs = self.rayleigh_cs(self.axis.h, y.l_mid)
+    #         log_fraction_array[i] = -cs * N * dh
+    #     return log_fraction_array
 
     def vertical_log_fraction(self) -> np.ndarray:
         '''This method returns the natural log of the fraction of light which
@@ -714,11 +735,12 @@ class Attenuation(ABC):
         # of axis points
         '''
         log_fraction_array = np.empty_like(self.yield_array, dtype='O')
-        N = self.atm.number_density(self.axis.h) / 1.e6 #convert to particles/cm^3
-        dh = self.axis.dh * 1.e2 #convert to cm
         for i, y in enumerate(self.yield_array):
-            cs = self.rayleigh_cs(self.axis.h, y.l_mid)
-            log_fraction_array[i] = -cs * N * dh
+            ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
+            e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
+            frac_surviving = np.exp(-e_of_h)
+            frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
+            log_fraction_array[i] = np.log(frac_step_surviving)
         return log_fraction_array
 
     def nm_to_cm(self,l):
