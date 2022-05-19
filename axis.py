@@ -628,7 +628,7 @@ class DownwardTiming(Timing):
 
         The size of the returned array is of size: (# of axis points,)
         '''
-        return self.axis.r[::-1] / self.c / nano
+        return -self.axis.r / self.c / nano
 
     def delay(self) -> np.ndarray:
         '''This is the implementation of the delay property
@@ -658,7 +658,7 @@ class DownwardTimingCurved(Timing):
 
         The size of the returned array is of size: (# of axis points,)
         '''
-        return self.axis.r[::-1] / self.c / nano
+        return -self.axis.r / self.c / nano
 
     def delay(self):
         '''This method returns the delay photons would experience when they
