@@ -59,7 +59,7 @@ class Axis(ABC):
     @property
     def h(self):
         '''h property definition'''
-        return np.linspace(self.ground_level+1., self.atm.maximum_height, 1000)
+        return np.linspace(self.ground_level+1., self.atm.maximum_height, 10000)
 
     @property
     def dh(self):

@@ -347,6 +347,15 @@ class ShowerSimulation:
             attenuated_photons += photons * fractions
         return attenuated_photons
 
+    def get_attenuated_photons_array(self, i=0, j=0):
+        ''''''
+        fraction_array = self.attenuations[i,j].fraction_passed()
+        photons_array = self.get_photons_array(i,j)
+        attenuated_photons = np.empty_like(photons_array)
+        for i, (photons, fractions) in enumerate(zip(photons_array, fraction_array)):
+            attenuated_photons[i] = photons * fractions
+        return attenuated_photons
+
     def get_attenuated_photon_sum(self, i=0, j=0):
         '''This method returns the attenuated total number of photons going to
         each counter.
