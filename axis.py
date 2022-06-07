@@ -769,22 +769,57 @@ class Attenuation(ABC):
     #         log_fraction_array[i] = -cs * N * dh
     #     return log_fraction_array
 
+    # def vertical_log_fraction(self) -> np.ndarray:
+    #     '''This method returns the natural log of the fraction of light which
+    #     survives each axis step if the light is travelling vertically.
+    #
+    #     The returned array is of size:
+    #     # of yield bins, with each entry being of size:
+    #     # of axis points
+    #     '''
+    #     log_fraction_array = np.empty_like(self.yield_array, dtype='O')
+    #     for i, y in enumerate(self.yield_array):
+    #         ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
+    #         e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
+    #         frac_surviving = np.exp(-e_of_h)
+    #         frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
+    #         log_fraction_array[i] = np.log(frac_step_surviving)
+    #     return log_fraction_array
+
     def vertical_log_fraction(self) -> np.ndarray:
         '''This method returns the natural log of the fraction of light which
         survives each axis step if the light is travelling vertically.
 
         The returned array is of size:
-        # of yield bins, with each entry being on size:
+        # of yield bins, with each entry being of size:
         # of axis points
         '''
-        log_fraction_array = np.empty_like(self.yield_array, dtype='O')
+        return np.frompyfunc(self.calculate_vlf,1,1)(self.lambda_mids)
+
+    def calculate_vlf(self, l):
+        '''This method returns the natural log of the fraction of light which
+        survives each axis step if the light is travelling vertically
+
+        Parameters:
+        y: yield object
+
+        Returns:
+        array of vertical-log-fraction values (size = # of axis points)
+        '''
+        ecoeffs = self.ecoeff[np.abs(l - self.l_list).argmin()]
+        e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
+        frac_surviving = np.exp(-e_of_h)
+        frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
+        return np.log(frac_step_surviving)
+    #
+
+    @property
+    def lambda_mids(self):
+        '''This property is a numpy array of the middle of each wavelength bin'''
+        l_mid_array = np.empty_like(self.yield_array)
         for i, y in enumerate(self.yield_array):
-            ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
-            e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
-            frac_surviving = np.exp(-e_of_h)
-            frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
-            log_fraction_array[i] = np.log(frac_step_surviving)
-        return log_fraction_array
+            l_mid_array[i] = y.l_mid
+        return l_mid_array
 
     def nm_to_cm(self,l):
         return l*nano*1.e2
