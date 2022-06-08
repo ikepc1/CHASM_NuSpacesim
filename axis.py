@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from atmosphere import Atmosphere
 from scipy.constants import value,nano
 from generate_Cherenkov import MakeYield
+from shower import Shower
 
 class Axis(ABC):
     '''This is the abstract base class which contains the methods for computing
@@ -180,6 +181,31 @@ class Axis(ABC):
         the specific axis type (up or down)
         '''
 
+class LateralSpread:
+    '''This class interacts with the table of NKG universal lateral distributions
+    '''
+    Moliere_data = np.load('lateral.npz')
+    t_Moliere = Moliere_data['t']
+    AVG_Moliere = Moliere_data['avg']
+
+    def rms_moliere(self, shower: Shower, axis: Axis) -> np.ndarray:
+        '''This method returns the average lateral spread in Moliere units as a
+        function of stage
+        '''
+        return np.interp(shower.stage(axis.X), self.t_Moliere, self.AVG_Moliere)
+
+    def moliere_radius(self, axis: Axis) -> np.ndarray:
+        '''This method returns the Moliere radius at each step along the axis
+        '''
+        return 96. / axis.density
+
+    def rms_width(self, shower: Shower, axis: Axis) -> np.ndarray:
+        '''This method returns the average spatial spread of charged particles
+        in a shower along an axis
+        '''
+        return self.rms_moliere(shower, axis) * self.moliere_radius(axis)
+
+
 class Counters(ABC):
     '''This is the class containing the neccessary methods for finding the
     vectors from a shower axis to a user defined array of Cherenkov detectors
@@ -332,17 +358,6 @@ class MakeFlatCounters(Counters):
         (# of counters, # of axis points)'''
         return self.area(axis) / (self.travel_length(axis)**2)
 
-# class FlatPlanarAtmAxis(Axis):
-    # @property
-    # def r(self):
-    #     return self.h / np.cos(self.zenith)
-#
-# class CurvedAtmAxis(Axis):
-#     @property
-#     def r(self):
-#         '''r property definition'''
-#         return self.h_to_axis_R_LOC(self.h, self.zenith)
-
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
     are added along the axis in the upward direction'''
@@ -385,6 +400,15 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         axes'''
         return UpwardAttenuation(self, counters, y)
 
+class MakeUpwardAxisFlatPlanarAtmSplit(MakeUpwardAxisFlatPlanarAtm):
+    '''This is the implementation of an upward going shower axis with a flat
+    planar atmosphere'''
+
+    def __repr__(self):
+        return "UpwardAxisFlatPlanarAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+                                        self.zenith, self.azimuth, self.ground_level)
+
+
 class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
     '''This is the implementation of an upward going shower axis with a flat
     planar atmosphere'''
@@ -406,6 +430,15 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
         return UpwardAttenuationCurved(self, counters, y)
+
+class MakeUpwardAxisCurvedAtmSplit(MakeUpwardAxisCurvedAtm):
+    '''This is the implementation of an upward going shower axis with a flat
+    planar atmosphere'''
+
+    def __repr__(self):
+        return "UpwardAxisCurvedAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+                                        self.zenith, self.azimuth, self.ground_level)
+
 
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
@@ -451,6 +484,15 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         axes'''
         return DownwardAttenuation(self, counters, y)
 
+class MakeDownwardAxisFlatPlanarAtmSplit(MakeDownwardAxisFlatPlanarAtm):
+    '''This is the implementation of a downward going shower axis with a flat
+    planar atmosphere.'''
+
+    def __repr__(self):
+        return "DownwardAxisFlatPlanarAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        self.zenith, self.azimuth, self.ground_level)
+
+
 class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
     '''This is the implementation of a downward going shower axis with a
     curved atmosphere.'''
@@ -473,6 +515,14 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
         return DownwardAttenuationCurved(self, counters, y)
+
+class MakeDownwardAxisCurvedAtmSplit(MakeDownwardAxisCurvedAtm):
+    '''This is the implementation of a downward going shower axis with a
+    curved atmosphere.'''
+
+    def __repr__(self):
+        return "DownwardAxisCurvedAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        self.zenith, self.azimuth, self.ground_level)
 
 def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
     '''This function divides some quantity specified at each atmospheric height
