@@ -420,7 +420,7 @@ class MakeDownwardAxis(Axis):
     def X(self):
         '''This method sets the depth attribute, depths are added along the axis
         in the downward direction'''
-        rho = self.atm.density(self.h)
+        rho = self.atm.density(self.altitude)
         axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
         return np.concatenate((np.cumsum(axis_deltaX[::-1])[::-1],
                     np.array([0])))
