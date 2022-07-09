@@ -361,7 +361,7 @@ class MakeFlatCounters(Counters):
         (# of counters, # of axis points)'''
         return self.area(axis) / (self.travel_length(axis)**2)
 
-def axis_to_mesh(axis: Axis, shower: Shower):
+def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     '''This function takes an shower axis and creates a 3d mesh of points around
     the axis (in coordinates where the axis is the z-axis)
     Parameters:
@@ -396,6 +396,11 @@ def axis_to_mesh(axis: Axis, shower: Shower):
         d.extend(np.full((xx.size), axis_d[i]).tolist())
     return np.array((x,y,z)).T, np.array(x)**2 + np.array(y)**2, np.array(t), np.array(d)
 
+def rotate_mesh(mesh: np.ndarray, theta: float, phi: float) -> np.ndarray:
+    '''This function rotates an array of vectors by polar angle theta and
+    azimuthal angle phi.
+    Returns a n
+    '''
 
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
@@ -563,7 +568,7 @@ class MakeDownwardAxisCurvedAtmMesh(MakeDownwardAxisCurvedAtm):
         return "DownwardAxisCurvedAtmMesh(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
         self.zenith, self.azimuth, self.ground_level)
 
-def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
+def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray) -> np.ndarray:
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the detector
@@ -599,7 +604,7 @@ def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counte
         integrals[:,i] = np.interp(Q[:,i], test_Q, test_integrals)
     return integrals
 
-def upward_curved_correction(axis: MakeUpwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
+def upward_curved_correction(axis: MakeUpwardAxisCurvedAtm, counters: Counters, vert: np.ndarray) -> np.ndarray:
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the top of the
