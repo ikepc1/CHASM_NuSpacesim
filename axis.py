@@ -188,22 +188,25 @@ class LateralSpread:
     t_Moliere = Moliere_data['t']
     AVG_Moliere = Moliere_data['avg']
 
-    def rms_moliere(self, shower: Shower, axis: Axis) -> np.ndarray:
+    @classmethod
+    def rms_moliere(cls, shower: Shower, axis: Axis) -> np.ndarray:
         '''This method returns the average lateral spread in Moliere units as a
         function of stage
         '''
-        return np.interp(shower.stage(axis.X), self.t_Moliere, self.AVG_Moliere)
+        return np.interp(shower.stage(axis.X), cls.t_Moliere, cls.AVG_Moliere)
 
-    def moliere_radius(self, axis: Axis) -> np.ndarray:
+    @staticmethod
+    def moliere_radius(axis: Axis) -> np.ndarray:
         '''This method returns the Moliere radius at each step along the axis
         '''
         return 96. / axis.density
 
-    def rms_width(self, shower: Shower, axis: Axis) -> np.ndarray:
+    @classmethod
+    def rms_width(cls, shower: Shower, axis: Axis) -> np.ndarray:
         '''This method returns the average spatial spread of charged particles
         in a shower along an axis
         '''
-        return self.rms_moliere(shower, axis) * self.moliere_radius(axis)
+        return cls.rms_moliere(shower, axis) * cls.moliere_radius(axis)
 
 
 class Counters(ABC):
@@ -358,6 +361,42 @@ class MakeFlatCounters(Counters):
         (# of counters, # of axis points)'''
         return self.area(axis) / (self.travel_length(axis)**2)
 
+def axis_to_mesh(axis: Axis, shower: Shower):
+    '''This function takes an shower axis and creates a 3d mesh of points around
+    the axis (in coordinates where the axis is the z-axis)
+    Parameters:
+    axis: axis type object
+    shower: shower type object
+    Returns:
+    an array of vectors to points in the mesh
+    size (, 3)
+    The distance from the axis of each point
+    The corresponding array of stages
+    The corresponding array of deltas
+    '''
+    nch = shower.profile(axis.X)
+    axis_t = shower.stage(axis.X)
+    axis_d = axis.delta
+    r = axis.r
+    frac_of_max = nch / shower.N_max
+    n_in_mesh = 2 * np.ceil(5 * frac_of_max)
+    max_width = 100. * frac_of_max
+    x = []
+    y = []
+    z = []
+    t = []
+    d = []
+    for i, n in enumerate(n_in_mesh):
+        side = np.linspace(-max_width[i], max_width[i], int(n))
+        xx, yy = np.meshgrid(side, side)
+        x.extend(xx.flatten().tolist())
+        y.extend(yy.flatten().tolist())
+        z.extend(np.full((xx.size), r[i]).tolist())
+        t.extend(np.full((xx.size), axis_t[i]).tolist())
+        d.extend(np.full((xx.size), axis_d[i]).tolist())
+    return np.array((x,y,z)).T, np.array(x)**2 + np.array(y)**2, np.array(t), np.array(d)
+
+
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
     are added along the axis in the upward direction'''
@@ -400,12 +439,12 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         axes'''
         return UpwardAttenuation(self, counters, y)
 
-class MakeUpwardAxisFlatPlanarAtmSplit(MakeUpwardAxisFlatPlanarAtm):
+class MakeUpwardAxisFlatPlanarAtmMesh(MakeUpwardAxisFlatPlanarAtm):
     '''This is the implementation of an upward going shower axis with a flat
     planar atmosphere'''
 
     def __repr__(self):
-        return "UpwardAxisFlatPlanarAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        return "UpwardAxisFlatPlanarAtmMesh(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
                                         self.zenith, self.azimuth, self.ground_level)
 
 
@@ -431,12 +470,12 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         axes'''
         return UpwardAttenuationCurved(self, counters, y)
 
-class MakeUpwardAxisCurvedAtmSplit(MakeUpwardAxisCurvedAtm):
+class MakeUpwardAxisCurvedAtmMesh(MakeUpwardAxisCurvedAtm):
     '''This is the implementation of an upward going shower axis with a flat
     planar atmosphere'''
 
     def __repr__(self):
-        return "UpwardAxisCurvedAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        return "UpwardAxisCurvedAtmMesh(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
                                         self.zenith, self.azimuth, self.ground_level)
 
 
@@ -484,12 +523,12 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         axes'''
         return DownwardAttenuation(self, counters, y)
 
-class MakeDownwardAxisFlatPlanarAtmSplit(MakeDownwardAxisFlatPlanarAtm):
+class MakeDownwardAxisFlatPlanarAtmMesh(MakeDownwardAxisFlatPlanarAtm):
     '''This is the implementation of a downward going shower axis with a flat
     planar atmosphere.'''
 
     def __repr__(self):
-        return "DownwardAxisFlatPlanarAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        return "DownwardAxisFlatPlanarAtmMesh(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
         self.zenith, self.azimuth, self.ground_level)
 
 
@@ -516,12 +555,12 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         axes'''
         return DownwardAttenuationCurved(self, counters, y)
 
-class MakeDownwardAxisCurvedAtmSplit(MakeDownwardAxisCurvedAtm):
+class MakeDownwardAxisCurvedAtmMesh(MakeDownwardAxisCurvedAtm):
     '''This is the implementation of a downward going shower axis with a
     curved atmosphere.'''
 
     def __repr__(self):
-        return "DownwardAxisCurvedAtmSplit(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
+        return "DownwardAxisCurvedAtmMesh(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
         self.zenith, self.azimuth, self.ground_level)
 
 def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
