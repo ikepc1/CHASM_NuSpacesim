@@ -2,6 +2,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from atmosphere import Atmosphere
 from scipy.constants import value,nano
+from scipy.spatial.transform import Rotation as R
 from generate_Cherenkov import MakeYield
 from shower import Shower
 
@@ -399,8 +400,23 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
 def rotate_mesh(mesh: np.ndarray, theta: float, phi: float) -> np.ndarray:
     '''This function rotates an array of vectors by polar angle theta and
     azimuthal angle phi.
-    Returns a n
+
+    Parameters:
+    mesh: numpy array of axis vectors shape = (# of vectors, 3)
+    theta: axis polar angle (radians)
+    phi: axis azimuthal angle (radians)
+    Returns a numpy array the same shape as the original list of vectors
     '''
+    theta_rot_axis = np.array([0,1,0]) #y axis
+    phi_rot_axis = np.array([0,0,1]) #z axis
+    theta_rot_vector = theta * theta_rot_axis
+    phi_rot_vector = phi * phi_rot_axis
+    theta_rotation = R.from_rotvec(theta_rot_vector)
+    phi_rotation = R.from_rotvec(phi_rot_vector)
+    mesh_rot_by_theta = theta_rotation.apply(mesh)
+    mesh_rot_by_theta_then_phi = phi_rotation.apply(mesh_rot_by_theta)
+    return mesh_rot_by_theta_then_phi
+
 
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
