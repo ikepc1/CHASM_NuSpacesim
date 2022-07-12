@@ -287,8 +287,8 @@ class ShowerSimulation:
                         a = axis[i,j]
                         s = shower
                     self.signals[i,j] = Signal(s, a, counters, y)
-                    self.times[i,j] = a.get_timing(counters)
-                    self.attenuations[i,j] = a.get_attenuation(counters, y)
+                    self.times[i,j] = a.get_timing(a, counters)
+                    self.attenuations[i,j] = a.get_attenuation(a, counters, y)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
