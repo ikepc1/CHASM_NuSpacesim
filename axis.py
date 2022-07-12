@@ -44,7 +44,7 @@ class Axis(ABC):
         if azimuth >= 2 * np.pi:
             raise ValueError('Azimuthal angle must be less than 2 * pi')
         if azimuth < 0.:
-            raise ValueError('Azimuthal angle cannot be less than 0')
+            raise Valueunattenuated_30degree_sealevelError('Azimuthal angle cannot be less than 0')
         self._azimuth = azimuth
 
     @property
@@ -60,44 +60,50 @@ class Axis(ABC):
         self._ground_level = value
 
     @property
-    def h(self):
-        '''h property definition'''
-        return np.linspace(self.ground_level+1., self.atm.maximum_height, 1000)
+    def altitude(self):
+        '''altitude property definition'''
+        return np.linspace(self.ground_level, self.atm.maximum_height, 1000)
 
     @property
     def dh(self):
-        '''This method sets the dr attribute'''
+        '''This method sets the dh attribute'''
         dh = self.h[1:] - self.h[:-1]
         return np.concatenate((np.array([0]),dh))
 
     @property
+    def h(self):
+        '''This is the height above the ground attribute'''
+        hs = self.altitude - self.ground_level
+        hs[0] = 1.e-5
+        return hs
+
+    @property
     def delta(self):
         '''delta property definition'''
-        return self.atm.delta(self.h)
+        return self.atm.delta(self.altitude)
 
     @property
     def density(self):
         '''Axis density property definition'''
-        return self.atm.density(self.h)
+        return self.atm.density(self.altitude)
 
-    @classmethod
-    def h_to_axis_R_LOC(cls,h,theta):
+    def h_to_axis_R_LOC(self,h,theta):
         '''Return the length along the shower axis from the point of Earth
         emergence to the height above the surface specified
 
         Parameters:
-        h: array of heights (m above sea level)
+        h: array of heights (m above ground level)
         theta: polar angle of shower axis (radians)
 
         returns: r (m) (same size as h), an array of distances along the shower
         axis_sp.
         '''
         cos_EM = np.cos(np.pi-theta)
-        R = cls.earth_radius
+        R = self.earth_radius + self.ground_level
         r_CoE= h + R # distance from the center of the earth to the specified height
         rs = R*cos_EM + np.sqrt(R**2*cos_EM**2-R**2+r_CoE**2)
-        rs -= rs[0]
-        rs[0] = 1.
+        # rs -= rs[0]
+        # rs[0] = 1.
         return rs # Need to find a better way to define axis zero point, currently they are all shifted by a meter to prevent divide by zero errors
 
     @classmethod
