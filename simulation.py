@@ -197,7 +197,7 @@ class Signal:
         # self.ng_sum = self.ng.sum(axis = 1)
 
     def __repr__(self):
-        return f"Signal({self.shower.__repr__()}, {self.axis.__repr__()}, {self.counters.__repr__()}, {self.y.__repr__()})"
+        return f"Signal({self.shower.__repr__()}, {self.axis.__repr__()}, {self.counters.__repr__()})"
 
     def calculate_gg(self):
         '''This funtion returns the interpolated values of gg at a given deltas
