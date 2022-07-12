@@ -368,7 +368,7 @@ class MakeFlatCounters(Counters):
         (# of counters, # of axis points)'''
         return self.area(axis_vectors) / (self.travel_length(axis_vectors)**2)
 
-def distribute_nch(Nch: float, r: np.ndarray, sig: float = .75) -> np.ndarray:
+def distribute_nch(Nch: float, r: np.ndarray, sig: float = .4) -> np.ndarray:
     '''This method assigns charged particles to the points in the mesh according to how
     far they are from the shower axis.
     Parameters:
@@ -406,7 +406,9 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     frac_of_max = total_nch / shower.N_max
     n_in_mesh = 2 * np.ceil(5 * frac_of_max) + 1.
     n_in_mesh[n_in_mesh == 0.] = 2.
-    max_width = 100 * frac_of_max
+    # max_width = 1000 * frac_of_max
+    shifted_stage = axis_t - axis_t.min()
+    max_width = shifted_stage * (1000 / shifted_stage.max()) + 1.
     x = []
     y = []
     z = []
