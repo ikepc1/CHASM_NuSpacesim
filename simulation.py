@@ -266,7 +266,7 @@ class ShowerSimulation:
                 return False
         return True
 
-    def run(self):
+    def run(self, mesh: bool = True):
         '''This is the proprietary run method which creates the arrays of
         Signal, Timing, and Attenuation objects
         '''
@@ -280,9 +280,15 @@ class ShowerSimulation:
         if self.check_ingredients():
             for i in range(axis.shape[0]):
                 for j in range(axis.shape[1]):
-                    self.signals[i,j] = Signal(shower, axis[i,j], counters, y)
-                    self.times[i,j] = axis[i,j].get_timing(counters)
-                    self.attenuations[i,j] = axis[i,j].get_attenuation(counters, y)
+                    if mesh:
+                        a = MeshAxis(axis[i,j],shower)
+                        s = MeshShower(a)
+                    else:
+                        a = axis[i,j]
+                        s = shower
+                    self.signals[i,j] = Signal(s, a, counters, y)
+                    self.times[i,j] = a.get_timing(counters)
+                    self.attenuations[i,j] = a.get_attenuation(counters, y)
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -393,7 +399,7 @@ if __name__ == '__main__':
     axis =  sim.ingredients['axis'][0,0]
     shower = sim.ingredients['shower'][0]
     counters = sim.ingredients['counters'][0]
-    y = sim.ingredients['yield'][0]
+    y = sim.ingredients['yield']
     ma = MeshAxis(axis, shower)
     ms = MeshShower(ma)
     # mesh_axis, r, t, d = axis_to_mesh(axis,shower)
