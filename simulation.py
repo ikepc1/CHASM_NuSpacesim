@@ -189,10 +189,10 @@ class Signal:
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
-        self.t = self.shower.stage(axis.X)
-        self.Nch = self.shower.profile(axis.X)
-        self.theta = self.axis.theta(counters)
-        self.omega = self.counters.omega(axis)
+        self.t = self.shower.stage(self.axis.X)
+        self.Nch = self.shower.profile(self.axis.X)
+        self.theta = self.axis.theta(axis.vectors, counters)
+        self.omega = self.counters.omega(self.axis.vectors)
         # self.ng = self.calculate_ng()
         # self.ng_sum = self.ng.sum(axis = 1)
 
@@ -364,10 +364,10 @@ if __name__ == '__main__':
 
     # theta = np.linspace(.01, np.radians(80),100)
     # phi = np.linspace(0, 1.999*np.pi, 10)
-    theta = np.radians(60)
-    phi = 0
+    theta = np.radians(5)
+    phi = np.radians(135)
 
-    x = np.linspace(-1000,1000,100)
+    x = np.linspace(-1000,1000,10)
     xx, yy = np.meshgrid(x,x)
     counters = np.empty([xx.size,3])
     counters[:,0] = xx.flatten()
@@ -389,6 +389,26 @@ if __name__ == '__main__':
     ax = plt.gca()
     ax.set_aspect('equal')
     plt.colorbar(label = 'Number of Cherenkov Photons')
+
+    axis =  sim.ingredients['axis'][0,0]
+    shower = sim.ingredients['shower'][0]
+    counters = sim.ingredients['counters'][0]
+    y = sim.ingredients['yield'][0]
+    ma = MeshAxis(axis, shower)
+    ms = MeshShower(ma)
+    # mesh_axis, r, t, d = axis_to_mesh(axis,shower)
+    # rotated_mesh_axis = rotate_mesh(mesh_axis, axis.zenith, axis.azimuth)
+    ax = fig.add_axes([0, 0, 1, 1], projection='3d')
+    ax.scatter(ma.mesh[:,0],ma.mesh[:,1],ma.mesh[:,2],s=.1)
+    ax.scatter(ma.vectors[:,0],ma.vectors[:,1],ma.vectors[:,2],c=ma.nch/ma.nch.max())
+    ax.scatter(axis.vectors[:,0],axis.vectors[:,1],axis.vectors[:,2],s=.5)
+    ax.set_xlim(-1000,1000)
+    ax.set_ylim(-1000,1000)
+    ax.set_zlim(0,6000)
+    ax.set_xlabel('x (m)')
+    ax.set_ylabel('y (m)')
+    ax.set_zlabel('z (m)')
+
 
     # counters = np.empty([100,3])
     #
