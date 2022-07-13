@@ -2,7 +2,10 @@ import numpy as np
 from abc import ABC, abstractmethod
 from atmosphere import Atmosphere
 from scipy.constants import value,nano
+from scipy.spatial.transform import Rotation as R
 from generate_Cherenkov import MakeYield
+from shower import Shower
+from scipy.stats import norm
 
 class Axis(ABC):
     '''This is the abstract base class which contains the methods for computing
@@ -186,6 +189,37 @@ class Axis(ABC):
         the specific axis type (up or down)
         '''
 
+class LateralSpread:
+    '''This class interacts with the table of NKG universal lateral distributions
+    '''
+    Moliere_data = np.load('lateral.npz')
+    t_Moliere = Moliere_data['t']
+    AVG_Moliere = Moliere_data['avg']
+
+    @classmethod
+    def rms_moliere(cls, shower: Shower, axis: Axis) -> np.ndarray:
+        '''This method returns the average lateral spread in Moliere units as a
+        function of stage
+        '''
+        return np.interp(shower.stage(axis.X), cls.t_Moliere, cls.AVG_Moliere)
+
+    @staticmethod
+    def moliere_radius(axis: Axis) -> np.ndarray:
+        '''This method returns the Moliere radius at each step along the axis
+        '''
+        return 96. / axis.density
+
+    @classmethod
+    def rms_width(cls, shower: Shower, axis: Axis) -> np.ndarray:
+        '''This method returns the average spatial spread of charged particles
+        in a shower along an axis
+        '''
+        return cls.rms_moliere(shower, axis) * cls.moliere_radius(axis)
+
+def vector_magnitude(vectors: np.ndarray):
+    '''This method computes the length of an array of vectors'''
+    return np.sqrt((vectors**2).sum(axis = -1))
+
 class Counters(ABC):
     '''This is the class containing the neccessary methods for finding the
     vectors from a shower axis to a user defined array of Cherenkov detectors
@@ -227,7 +261,7 @@ class Counters(ABC):
     @property
     def r(self):
         '''distance to each counter property definition'''
-        return self.vector_magnitude(self.vectors)
+        return vector_magnitude(self.vectors)
 
     @abstractmethod
     def area(self, *args, **kwargs):
@@ -245,10 +279,6 @@ class Counters(ABC):
         '''This method returns the full area of the counting aperture.'''
         return np.pi * self.input_radius**2
 
-    def vector_magnitude(self, vectors: np.ndarray):
-        '''This method computes the length of an array of vectors'''
-        return np.sqrt((vectors**2).sum(axis = -1))
-
     def law_of_cosines(self, a: np.ndarray, b: np.ndarray, c: np.ndarray):
         '''This method returns the angle C across from side c in triangle abc'''
         cos_C = (c**2 - a**2 - b**2)/(-2*a*b)
@@ -256,32 +286,32 @@ class Counters(ABC):
         cos_C[cos_C < -1.] = -1.
         return np.arccos(cos_C)
 
-    def travel_vectors(self, axis: Axis):
+    def travel_vectors(self, axis_vectors):
         '''This method returns the vectors from each entry in vectors to
         the user defined array of counters'''
-        return self.vectors.reshape(-1,1,3) - axis.vectors
+        return self.vectors.reshape(-1,1,3) - axis_vectors
 
-    def travel_length(self, axis: Axis):
+    def travel_length(self, axis_vectors):
         '''This method computes the distance from each point on the axis to
         each counter'''
-        return self.vector_magnitude(self.travel_vectors(axis))
+        return vector_magnitude(self.travel_vectors(axis_vectors))
 
-    def cos_Q(self, axis: Axis):
+    def cos_Q(self, axis_vectors):
         '''This method returns the cosine of the angle between the z-axis and
         the vector from the axis to the counter'''
-        travel_n = self.travel_vectors(axis) / self.travel_length(axis)[:,:,np.newaxis]
+        travel_n = self.travel_vectors(axis_vectors) / self.travel_length(axis_vectors)[:,:,np.newaxis]
         return np.abs(travel_n[:,:,-1])
 
-    def travel_n(self, axis: Axis) -> np.ndarray:
+    def travel_n(self, axis_vectors) -> np.ndarray:
         '''This method returns the unit vectors pointing along each travel
         vector.
         '''
-        return self.travel_vectors(axis) / self.travel_length(axis)[:,:,np.newaxis]
+        return self.travel_vectors(axis_vectors) / self.travel_length(axis_vectors)[:,:,np.newaxis]
 
-    def calculate_theta(self, axis: Axis):
+    def calculate_theta(self, axis_vectors):
         '''This method calculates the angle between the axis and counters'''
-        travel_length = self.travel_length(axis)
-        axis_length = np.broadcast_to(axis.r, travel_length.shape)
+        travel_length = self.travel_length(axis_vectors)
+        axis_length = np.broadcast_to(vector_magnitude(axis_vectors), travel_length.shape)
         counter_length = np.broadcast_to(self.r, travel_length.T.shape).T
         return self.law_of_cosines(axis_length, travel_length, counter_length)
 
@@ -325,29 +355,191 @@ class MakeFlatCounters(Counters):
         return "FlatCounters({:.2f} Counters with average area~ {:.2f})".format(
         self.vectors.shape[0], self.area_normal().mean())
 
-    def area(self, axis: Axis):
+    def area(self, axis_vectors):
         '''This is the implementation of the area method for flat counting
         apertures. This method returns the area represented by each aperture as
         seen by each point on the axis. The returned array is of size
         (# of counters, # of axis points).'''
-        return (self.cos_Q(axis).T * self.area_normal()).T
+        return (self.cos_Q(axis_vectors).T * self.area_normal()).T
 
-    def omega(self, axis: Axis):
+    def omega(self, axis_vectors):
         '''This method computes the solid angle of each counter as seen by
         each point on the axis
         (# of counters, # of axis points)'''
-        return self.area(axis) / (self.travel_length(axis)**2)
+        return self.area(axis_vectors) / (self.travel_length(axis_vectors)**2)
 
-# class FlatPlanarAtmAxis(Axis):
-    # @property
-    # def r(self):
-    #     return self.h / np.cos(self.zenith)
-#
-# class CurvedAtmAxis(Axis):
-#     @property
-#     def r(self):
-#         '''r property definition'''
-#         return self.h_to_axis_R_LOC(self.h, self.zenith)
+def distribute_nch(Nch: float, r: np.ndarray, sig: float = .6) -> np.ndarray:
+    '''This method assigns charged particles to the points in the mesh according to how
+    far they are from the shower axis.
+    Parameters:
+    Nch = number of charged particles
+    r = array of distances away from the axis
+    sig = sigma to be used with the normal distribution
+    returns: an array of the number of charged particles associated with each r
+    same shape as r
+    '''
+    scaler = r / r.max()
+    nch_scaler = norm.pdf(scaler, scale = sig)
+    nch_scaler /= nch_scaler.sum()
+    return nch_scaler * Nch
+
+def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
+    '''This function takes an shower axis and creates a 3d mesh of points around
+    the axis (in coordinates where the axis is the z-axis)
+    Parameters:
+    axis: axis type object
+    shower: shower type object
+    Returns:
+    an array of vectors to points in the mesh
+    size (, 3)
+    The corresponding # of charged particles at each point
+    The corresponding array of stages (for use in universality calcs)
+    The corresponding array of deltas (for use in universality calcs)
+    The corresponding array of shower steps (dr) in m (for Cherenkov yield calcs)
+    The corresponding array of heights (for timing calcs)
+
+    '''
+    total_nch = shower.profile(axis.X)
+    total_nch[total_nch == 0] = 1.e-10
+    axis_t = shower.stage(axis.X)
+    axis_d = axis.delta
+    axis_dr = axis.dr
+    axis_altitude = axis.altitude
+    r = axis.r
+    frac_of_max = total_nch / shower.N_max
+    n_in_mesh = 2 * np.ceil(5 * frac_of_max) + 1.
+    n_in_mesh[n_in_mesh == 0.] = 2.
+    # max_width = 1000 * frac_of_max
+    shifted_stage = axis_t - axis_t.min()
+    max_width = shifted_stage * (600 / shifted_stage.max()) + 1.
+    x = []
+    y = []
+    z = []
+    t = []
+    d = []
+    nch = []
+    dr = []
+    a = []
+    for i, n in enumerate(n_in_mesh):
+        side = np.linspace(-max_width[i], max_width[i], int(n))
+        xx, yy = np.meshgrid(side, side)
+        nch.extend(distribute_nch(total_nch[i], (xx**2 + yy**2).flatten()).tolist())
+        x.extend(xx.flatten().tolist())
+        y.extend(yy.flatten().tolist())
+        z.extend(np.full((xx.size), r[i]).tolist())
+        t.extend(np.full((xx.size), axis_t[i]).tolist())
+        d.extend(np.full((xx.size), axis_d[i]).tolist())
+        dr.extend(np.full((xx.size), axis_dr[i]).tolist())
+        a.extend(np.full((xx.size), axis_altitude[i]).tolist())
+    return np.array((x,y,z)).T, np.array(nch), np.array(t), np.array(d), np.array(dr), np.array(a)
+
+def rotate_mesh(mesh: np.ndarray, theta: float, phi: float) -> np.ndarray:
+    '''This function rotates an array of vectors by polar angle theta and
+    azimuthal angle phi.
+
+    Parameters:
+    mesh: numpy array of axis vectors shape = (# of vectors, 3)
+    theta: axis polar angle (radians)
+    phi: axis azimuthal angle (radians)
+    Returns a numpy array the same shape as the original list of vectors
+    '''
+    theta_rot_axis = np.array([0,1,0]) #y axis
+    phi_rot_axis = np.array([0,0,1]) #z axis
+    theta_rot_vector = theta * theta_rot_axis
+    phi_rot_vector = phi * phi_rot_axis
+    theta_rotation = R.from_rotvec(theta_rot_vector)
+    phi_rotation = R.from_rotvec(phi_rot_vector)
+    mesh_rot_by_theta = theta_rotation.apply(mesh)
+    mesh_rot_by_theta_then_phi = phi_rotation.apply(mesh_rot_by_theta)
+    return mesh_rot_by_theta_then_phi
+
+class MeshAxis(Axis):
+    '''This class is the implementation of an axis where the sampled points are
+    spread into a mesh.
+    '''
+
+    def __init__(self, linear_axis: Axis, shower: Shower):
+        self.linear_axis = linear_axis
+        self.shower = shower
+        self.zenith = linear_axis.zenith
+        self.azimuth = linear_axis.azimuth
+        self.ground_level = linear_axis.ground_level
+        self.mesh, self.nch, self.t, self.d, self.d_r, self._a  = axis_to_mesh(self.linear_axis, self.shower)
+        self.rotated_mesh = rotate_mesh(self.mesh, linear_axis.zenith, linear_axis.azimuth)
+
+    @property
+    def delta(self):
+        '''Override of the delta property so each one corresponds to its
+        respective mesh point.'''
+        return self.d
+
+    @property
+    def vectors(self):
+        '''axis vector property definition
+
+        returns vectors from the origin to mesh axis points.
+        '''
+        return self.rotated_mesh
+
+    @property
+    def r(self):
+        '''overrided r property definition'''
+        return vector_magnitude(self.rotated_mesh)
+
+    @property
+    def dr(self):
+        '''overrided dr property definition'''
+        return self.d_r
+
+    @property
+    def altitude(self):
+        '''overrided h property definition'''
+        return self._a
+
+    @property
+    def X(self):
+        '''This method sets the depth along the shower axis attribute'''
+        return self.linear_axis.X
+
+    def distance(self, X: np.ndarray):
+        '''This method is the distance along the axis as a function of depth'''
+        return self.axis.distance
+
+    def theta(self, axis_vectors, counters: Counters):
+        '''This method computes the ACUTE angles between the shower axis and the
+        vectors toward each counter'''
+        return self.linear_axis.theta(axis_vectors, counters)
+
+    def get_timing(self, axis: Axis, counters: Counters):
+        '''This method should return the specific timing factory needed for
+        the specific axis type (up or down)
+        '''
+        return self.linear_axis.get_timing(axis, counters)
+
+    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
+        '''This method should return the specific attenuation factory needed for
+        the specific axis type (up or down)
+        '''
+        return self.linear_axis.get_attenuation(axis, counters, y)
+
+class MeshShower(Shower):
+    '''This class is the implementation of a shower where the shower particles are
+    distributed to a mesh axis rather than just the longitudinal axis.
+    '''
+
+    def __init__(self, mesh_axis: MeshAxis):
+        self.mesh_axis = mesh_axis
+
+    def stage(self, X: np.ndarray):
+        '''This method returns the corresponding stage of each mesh point.
+        '''
+        return self.mesh_axis.t
+
+    def profile(self, X: np.ndarray):
+        '''This method returns the number of charged particles at each mesh
+        point
+        '''
+        return self.mesh_axis.nch
 
 class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
@@ -356,7 +548,7 @@ class MakeUpwardAxis(Axis):
     @property
     def X(self):
         '''This method sets the depth attribute'''
-        rho = self.atm.density(self.h)
+        rho = self.atm.density(self.altitude)
         axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
         return np.concatenate((np.array([0]),np.cumsum(axis_deltaX)))
 
@@ -364,10 +556,10 @@ class MakeUpwardAxis(Axis):
         '''This method is the distance along the axis as a function of depth'''
         return np.interp(X, self.X, self.r)
 
-    def theta(self, counters: Counters):
+    def theta(self, axis_vectors, counters: Counters):
         '''In this case we need pi minus the interal angle across from the
         distance to the counter'''
-        return np.pi - counters.calculate_theta(self)
+        return np.pi - counters.calculate_theta(axis_vectors)
 
 class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
     '''This is the implementation of an upward going shower axis with a flat
@@ -382,14 +574,14 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h / np.cos(self.zenith)
 
-    def get_timing(self, counters: Counters):
+    def get_timing(self, axis: Axis, counters: Counters):
         '''This method returns the instantiated upward flat atm timing object'''
-        return UpwardTiming(self, counters)
+        return UpwardTiming(axis, counters)
 
-    def get_attenuation(self, counters: Counters, y: MakeYield):
+    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
-        return UpwardAttenuation(self, counters, y)
+        return UpwardAttenuation(axis, counters, y)
 
 class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
     '''This is the implementation of an upward going shower axis with a flat
@@ -404,14 +596,14 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
-    def get_timing(self, counters: Counters):
+    def get_timing(self, axis: Axis, counters: Counters):
         '''This method returns the instantiated upward flat atm timing object'''
-        return UpwardTimingCurved(self, counters)
+        return UpwardTimingCurved(axis, counters)
 
-    def get_attenuation(self, counters: Counters, y: MakeYield):
+    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
-        return UpwardAttenuationCurved(self, counters, y)
+        return UpwardAttenuationCurved(axis, counters, y)
 
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
@@ -429,10 +621,10 @@ class MakeDownwardAxis(Axis):
         '''This method is the distance along the axis as a function of depth'''
         return np.interp(X, self.X[::-1], self.r[::-1])
 
-    def theta(self, counters: Counters):
+    def theta(self, axis_vectors, counters: Counters):
         '''This method returns the angle between the axis and the vector going
         to the counter, in this case it's the internal angle'''
-        return counters.calculate_theta(self)
+        return counters.calculate_theta(axis_vectors)
 
 class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
     '''This is the implementation of a downward going shower axis with a flat
@@ -447,15 +639,15 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         '''This is the axis distance property definition'''
         return self.h / np.cos(self.zenith)
 
-    def get_timing(self, counters: Counters):
+    def get_timing(self, axis: Axis, counters: Counters):
         '''This method returns the instantiated flat atm downward timing object
         '''
-        return DownwardTiming(self, counters)
+        return DownwardTiming(axis, counters)
 
-    def get_attenuation(self, counters: Counters, y: MakeYield):
+    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
-        return DownwardAttenuation(self, counters, y)
+        return DownwardAttenuation(axis, counters, y)
 
 class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
     '''This is the implementation of a downward going shower axis with a
@@ -470,17 +662,17 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
-    def get_timing(self, counters: Counters):
+    def get_timing(self, axis: Axis, counters: Counters):
         '''This method returns the instantiated flat atm downward timing object
         '''
-        return DownwardTimingCurved(self, counters)
+        return DownwardTimingCurved(axis, counters)
 
-    def get_attenuation(self, counters: Counters, y: MakeYield):
+    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
-        return DownwardAttenuationCurved(self, counters, y)
+        return DownwardAttenuationCurved(axis, counters, y)
 
-def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
+def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray) -> np.ndarray:
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the detector
@@ -500,7 +692,7 @@ def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counte
     The shape is:
     (# of counters, # of axis points)
     '''
-    cQ = counters.cos_Q(axis)
+    cQ = counters.cos_Q(axis.vectors)
     integrals = np.empty_like(cQ)
     Q = np.arccos(cQ)
     sQ = np.sin(Q)
@@ -516,7 +708,7 @@ def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counte
         integrals[:,i] = np.interp(Q[:,i], test_Q, test_integrals)
     return integrals
 
-def upward_curved_correction(axis: MakeUpwardAxisCurvedAtm, counters: Counters, vert: np.ndarray):
+def upward_curved_correction(axis: MakeUpwardAxisCurvedAtm, counters: Counters, vert: np.ndarray) -> np.ndarray:
     '''This function divides some quantity specified at each atmospheric height
     by the approriate cosine (of the local angle between vertical in the
     atmosphere and the counters), then sums those steps to the top of the
@@ -536,7 +728,7 @@ def upward_curved_correction(axis: MakeUpwardAxisCurvedAtm, counters: Counters, 
     The shape is:
     (# of counters, # of axis points)
     '''
-    cQ = counters.cos_Q(axis)
+    cQ = counters.cos_Q(axis.vectors)
     integrals = np.empty_like(cQ)
     Q = np.arccos(cQ)
     sQ = np.sin(Q)
@@ -584,7 +776,7 @@ class Timing(ABC):
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        return self.counters.travel_length(self.axis) / self.c / nano
+        return self.counters.travel_length(self.axis.vectors) / self.c / nano
 
     @property
     @abstractmethod
@@ -639,7 +831,7 @@ class DownwardTiming(Timing):
     def delay(self) -> np.ndarray:
         '''This is the implementation of the delay property
         '''
-        return self.vertical_delay() / self.counters.cos_Q(self.axis)
+        return self.vertical_delay() / self.counters.cos_Q(self.axis.vectors)
 
 class DownwardTimingCurved(Timing):
     '''This is the implementation of timing for a downward shower using a curved
@@ -708,7 +900,7 @@ class UpwardTiming(Timing):
     def delay(self) -> np.ndarray:
         '''This is the implementation of the delay property
         '''
-        return self.vertical_delay() / self.counters.cos_Q(self.axis)
+        return self.vertical_delay() / self.counters.cos_Q(self.axis.vectors)
 
 class UpwardTimingCurved(Timing):
     '''This is the implementation of timing for a upward going shower with
@@ -752,7 +944,7 @@ class Attenuation(ABC):
     abstable = np.load('abstable.npz')
     ecoeff = abstable['ecoeff']
     l_list = abstable['wavelength']
-    h_list = abstable['height']
+    altitude_list = abstable['height']
 
     def __init__(self, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
@@ -786,7 +978,7 @@ class Attenuation(ABC):
     #     log_fraction_array = np.empty_like(self.yield_array, dtype='O')
     #     for i, y in enumerate(self.yield_array):
     #         ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
-    #         e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
+    #         e_of_h = np.interp(self.axis.h, self.altitude_list, ecoeffs)
     #         frac_surviving = np.exp(-e_of_h)
     #         frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
     #         log_fraction_array[i] = np.log(frac_step_surviving)
@@ -813,7 +1005,7 @@ class Attenuation(ABC):
         array of vertical-log-fraction values (size = # of axis points)
         '''
         ecoeffs = self.ecoeff[np.abs(l - self.l_list).argmin()]
-        e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
+        e_of_h = np.interp(self.axis.altitude, self.altitude_list, ecoeffs)
         frac_surviving = np.exp(-e_of_h)
         frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
         return np.log(frac_step_surviving)
@@ -895,7 +1087,7 @@ class DownwardAttenuation(Attenuation):
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
         log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
-        cQ = self.counters.cos_Q(self.axis)
+        cQ = self.counters.cos_Q(self.axis.vectors)
         for i, v_log_frac in enumerate(vert_log_fraction_list):
             log_frac_passed_list[i] = np.cumsum(v_log_frac / cQ, axis=1)
         return log_frac_passed_list
@@ -945,7 +1137,7 @@ class UpwardAttenuation(Attenuation):
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
         log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
-        cQ = self.counters.cos_Q(self.axis)
+        cQ = self.counters.cos_Q(self.axis.vectors)
         for i, v_log_frac in enumerate(vert_log_fraction_list):
             log_frac_passed_list[i] = np.cumsum((v_log_frac / cQ)[:,::-1], axis=1)[:,::-1]
         return log_frac_passed_list
