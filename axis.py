@@ -368,7 +368,7 @@ class MakeFlatCounters(Counters):
         (# of counters, # of axis points)'''
         return self.area(axis_vectors) / (self.travel_length(axis_vectors)**2)
 
-def distribute_nch(Nch: float, r: np.ndarray, sig: float = .4) -> np.ndarray:
+def distribute_nch(Nch: float, r: np.ndarray, sig: float = .6) -> np.ndarray:
     '''This method assigns charged particles to the points in the mesh according to how
     far they are from the shower axis.
     Parameters:
@@ -392,23 +392,26 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     Returns:
     an array of vectors to points in the mesh
     size (, 3)
-    The distance from the axis of each point
-    The corresponding array of stages
-    The corresponding array of deltas
+    The corresponding # of charged particles at each point
+    The corresponding array of stages (for use in universality calcs)
+    The corresponding array of deltas (for use in universality calcs)
+    The corresponding array of shower steps (dr) in m (for Cherenkov yield calcs)
+    The corresponding array of heights (for timing calcs)
+
     '''
     total_nch = shower.profile(axis.X)
     total_nch[total_nch == 0] = 1.e-10
     axis_t = shower.stage(axis.X)
     axis_d = axis.delta
     axis_dr = axis.dr
-    axis_h = axis.h
+    axis_altitude = axis.altitude
     r = axis.r
     frac_of_max = total_nch / shower.N_max
     n_in_mesh = 2 * np.ceil(5 * frac_of_max) + 1.
     n_in_mesh[n_in_mesh == 0.] = 2.
     # max_width = 1000 * frac_of_max
     shifted_stage = axis_t - axis_t.min()
-    max_width = shifted_stage * (1000 / shifted_stage.max()) + 1.
+    max_width = shifted_stage * (600 / shifted_stage.max()) + 1.
     x = []
     y = []
     z = []
@@ -416,19 +419,19 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     d = []
     nch = []
     dr = []
-    h = []
+    a = []
     for i, n in enumerate(n_in_mesh):
         side = np.linspace(-max_width[i], max_width[i], int(n))
         xx, yy = np.meshgrid(side, side)
-        nch.extend(distribute_nch(total_nch[i],(xx**2 + yy**2).flatten()).tolist())
+        nch.extend(distribute_nch(total_nch[i], (xx**2 + yy**2).flatten()).tolist())
         x.extend(xx.flatten().tolist())
         y.extend(yy.flatten().tolist())
         z.extend(np.full((xx.size), r[i]).tolist())
         t.extend(np.full((xx.size), axis_t[i]).tolist())
         d.extend(np.full((xx.size), axis_d[i]).tolist())
         dr.extend(np.full((xx.size), axis_dr[i]).tolist())
-        h.extend(np.full((xx.size), axis_h[i]).tolist())
-    return np.array((x,y,z)).T, np.array(nch), np.array(t), np.array(d), np.array(dr), np.array(h)
+        a.extend(np.full((xx.size), axis_altitude[i]).tolist())
+    return np.array((x,y,z)).T, np.array(nch), np.array(t), np.array(d), np.array(dr), np.array(a)
 
 def rotate_mesh(mesh: np.ndarray, theta: float, phi: float) -> np.ndarray:
     '''This function rotates an array of vectors by polar angle theta and
@@ -461,7 +464,7 @@ class MeshAxis(Axis):
         self.zenith = linear_axis.zenith
         self.azimuth = linear_axis.azimuth
         self.ground_level = linear_axis.ground_level
-        self.mesh, self.nch, self.t, self.d, self.d_r, self._h  = axis_to_mesh(self.linear_axis, self.shower)
+        self.mesh, self.nch, self.t, self.d, self.d_r, self._a  = axis_to_mesh(self.linear_axis, self.shower)
         self.rotated_mesh = rotate_mesh(self.mesh, linear_axis.zenith, linear_axis.azimuth)
 
     @property
@@ -489,9 +492,9 @@ class MeshAxis(Axis):
         return self.d_r
 
     @property
-    def h(self):
+    def altitude(self):
         '''overrided h property definition'''
-        return self._h
+        return self._a
 
     @property
     def X(self):
@@ -941,7 +944,7 @@ class Attenuation(ABC):
     abstable = np.load('abstable.npz')
     ecoeff = abstable['ecoeff']
     l_list = abstable['wavelength']
-    h_list = abstable['height']
+    altitude_list = abstable['height']
 
     def __init__(self, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.axis = axis
@@ -975,7 +978,7 @@ class Attenuation(ABC):
     #     log_fraction_array = np.empty_like(self.yield_array, dtype='O')
     #     for i, y in enumerate(self.yield_array):
     #         ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
-    #         e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
+    #         e_of_h = np.interp(self.axis.h, self.altitude_list, ecoeffs)
     #         frac_surviving = np.exp(-e_of_h)
     #         frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
     #         log_fraction_array[i] = np.log(frac_step_surviving)
@@ -1002,7 +1005,7 @@ class Attenuation(ABC):
         array of vertical-log-fraction values (size = # of axis points)
         '''
         ecoeffs = self.ecoeff[np.abs(l - self.l_list).argmin()]
-        e_of_h = np.interp(self.axis.h, self.h_list, ecoeffs)
+        e_of_h = np.interp(self.axis.altitude, self.altitude_list, ecoeffs)
         frac_surviving = np.exp(-e_of_h)
         frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
         return np.log(frac_step_surviving)
