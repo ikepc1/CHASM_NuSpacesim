@@ -407,11 +407,12 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     axis_altitude = axis.altitude
     r = axis.r
     frac_of_max = total_nch / shower.N_max
-    n_in_mesh = 2 * np.ceil(5 * frac_of_max) + 1.
-    n_in_mesh[n_in_mesh == 0.] = 2.
     # max_width = 1000 * frac_of_max
     shifted_stage = axis_t - axis_t.min()
     max_width = shifted_stage * (600 / shifted_stage.max()) + 1.
+    # frac_of_max = shifted_stage  / shifted_stage.max()
+    n_in_mesh = 2 * np.ceil(5 * frac_of_max) + 1.
+    n_in_mesh[n_in_mesh == 0.] = 2.
     x = []
     y = []
     z = []

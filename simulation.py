@@ -339,6 +339,21 @@ class ShowerSimulation:
         '''
         return self.times[i,j].counter_time()
 
+    def get_attenuated_photons_array(self, i=0, j=0):
+        '''This method returns the attenuated number of photons going from each
+        step to each counter.
+
+        The returned array is of size:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
+        fraction_array = self.attenuations[i,j].fraction_passed()
+        photons_array = self.get_photons_array(i,j)
+        attenuated_photons = np.zeros_like(photons_array)
+        for i, (photons, fractions) in enumerate(zip(photons_array, fraction_array)):
+            attenuated_photons[i] = photons * fractions
+        return attenuated_photons
+
     def get_attenuated_photons(self, i=0, j=0):
         '''This method returns the attenuated number of photons going from each
         step to each counter.
