@@ -465,8 +465,8 @@ class MeshAxis(Axis):
         self.zenith = linear_axis.zenith
         self.azimuth = linear_axis.azimuth
         self.ground_level = linear_axis.ground_level
-        self.mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.linear_axis, self.shower)
-        self.rotated_mesh = rotate_mesh(self.mesh, linear_axis.zenith, linear_axis.azimuth)
+        mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.linear_axis, self.shower)
+        self.rotated_mesh = rotate_mesh(mesh, linear_axis.zenith, linear_axis.azimuth)
 
     @property
     def delta(self):
