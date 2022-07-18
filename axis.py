@@ -396,7 +396,7 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     The corresponding array of stages (for use in universality calcs)
     The corresponding array of deltas (for use in universality calcs)
     The corresponding array of shower steps (dr) in m (for Cherenkov yield calcs)
-    The corresponding array of heights (for timing calcs)
+    The corresponding array of altitudes (for timing calcs)
 
     '''
     total_nch = shower.profile(axis.X)
