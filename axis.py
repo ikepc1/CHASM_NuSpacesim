@@ -465,14 +465,14 @@ class MeshAxis(Axis):
         self.zenith = linear_axis.zenith
         self.azimuth = linear_axis.azimuth
         self.ground_level = linear_axis.ground_level
-        self.mesh, self.nch, self.t, self.d, self.d_r, self._a  = axis_to_mesh(self.linear_axis, self.shower)
+        self.mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.linear_axis, self.shower)
         self.rotated_mesh = rotate_mesh(self.mesh, linear_axis.zenith, linear_axis.azimuth)
 
     @property
     def delta(self):
         '''Override of the delta property so each one corresponds to its
         respective mesh point.'''
-        return self.d
+        return self._d
 
     @property
     def vectors(self):
@@ -490,7 +490,7 @@ class MeshAxis(Axis):
     @property
     def dr(self):
         '''overrided dr property definition'''
-        return self.d_r
+        return self._dr
 
     @property
     def altitude(self):
@@ -534,7 +534,7 @@ class MeshShower(Shower):
     def stage(self, X: np.ndarray):
         '''This method returns the corresponding stage of each mesh point.
         '''
-        return self.mesh_axis.t
+        return self.mesh_axis._t
 
     def profile(self, X: np.ndarray):
         '''This method returns the number of charged particles at each mesh
