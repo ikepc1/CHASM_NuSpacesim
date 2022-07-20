@@ -9,6 +9,7 @@ Modified to include Douglas Bergman's 2013 parameterization, June 2020
 import numpy as np
 from scipy.constants import physical_constants
 from scipy.integrate import quad
+from atmosphere import *
 
 class EnergyDistribution:
     """
@@ -347,8 +348,8 @@ class LateralDistributionNKG:
 
     pm = {'zp00':0,'zp01':1,'zp10':2,'zp11':3,'xp10':4}
     pz = np.array([0.0238,1.069,0.0238,2.918,0.430])
-    ll = 1.e-3
-    ul = 1.e1
+    ll = np.log(1.e-3)
+    ul = np.log(1.e1)
 
     def __init__(self,t):
         self.t = t
@@ -367,7 +368,7 @@ class LateralDistributionNKG:
     def set_xp1(self):
         self.xp1 = self.pz[self.pm['xp10']]
 
-    def n_t_lX(self,X):
+    def n_t_lX_of_X(self, X):
         """
         This function returns the particle lateral distribution as a
         function of the Moliere radius.
@@ -379,6 +380,20 @@ class LateralDistributionNKG:
         n_t_lX = the normalized lateral distribution value at X
         """
         return self.C0 * X ** self.zp0 * (self.xp1 + X) ** self.zp1
+
+    def n_t_lX(self,lX):
+        """
+        This function returns the particle lateral distribution as a
+        function of the Moliere radius.
+
+        Parameters:
+        X = Moliere radius (dimensionless)
+
+        Returns:
+        n_t_lX = the normalized lateral distribution value at X
+        """
+        X = np.exp(lX)
+        return self.n_t_lX_of_X(X)
 
     def set_t(self,t):
         self.t = t
@@ -400,55 +415,114 @@ class LateralDistributionNKG:
         intgrl,eps = quad(self.AVG_integrand,self.ll,self.ul)
         return intgrl
 
+    def d_rho_dA_of_r_d(self, r: float, d: float) -> float:
+        '''This method returns the fractional particle density at a distance r
+        from a piont in the shower core.
+
+        Parameters:
+        r: distance from shower core (m)
+        r_M: the approximate Moliere radius at the shower core (m)
+        d: the atmospheric density at the core (kg / m^3)
+
+        returns:
+        fractional particle density (fraction of total particles / m^2)
+        '''
+        rM = self.moliere_radius(d)
+        X = r / rM
+        return self.n_t_lX_of_X(X) / (2. * np.pi * X**2 * rM**2)
+
+    @staticmethod
+    def moliere_radius(d: float) -> float:
+        '''Returns approximate Moliere radius at density (d)
+
+        Parameters:
+        d: density (kg/m^3)
+        returns:
+        Moliere radius (m)
+        '''
+        return 96. / d
+
+    def make_table(self):
+        atm = Atmosphere()
+        ts = np.linspace(-20.,20.,100)
+        ds = np.linspace(atm.density(0.), atm.density(atm.maximum_height), 1000)
+        rs = np.logspace(-3,3,300)
+        drho_dN_of_t_d_r = np.empty((ts.size,ds.size,rs.size),dtype=float)
+        for i, t in enumerate(ts):
+            self.set_t(t)
+            for j, d in enumerate(ds):
+                drho_dN_of_t_d_r[i,j] = self.d_rho_dA_of_r_d(rs, d)
+        return ts, ds, rs, drho_dN_of_t_d_r
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     plt.ion()
+    atm = Atmosphere()
+    d = atm.density(0.)
 
-    # ld = LateralDistributionNKG(0)
-    # X = np.linspace(ld.ll,ld.ul,1000)
-    # ts = np.linspace(-20,20,21)
-    # avg = np.empty_like(ts)
-    # for i,t in enumerate(ts):
-    #     ld.set_t(t)
-    #     avg[i] = ld.AVG
-    # np.savez('lateral.npz',t=ts,avg=avg)
-    ll = np.radians(0.1)
-    ul = np.radians(45.)
-    lqrad = np.linspace(np.log(ll),np.log(ul),450)
-    qrad = np.exp(lqrad)
-
-    fig = plt.figure()
-    qd = AngularDistribution(np.log(1.),'l')
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 MeV')
-    qd.set_lE(np.log(5.))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='5 MeV')
-    qd.set_lE(np.log(30.))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='30 MeV')
-    qd.set_lE(np.log(170.))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='170 MeV')
-    qd.set_lE(np.log(1.e3))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 GeV')
-    plt.loglog()
+    x = np.logspace(-3,2,100)
+    lx = np.log(x)
+    ld = LateralDistributionNKG(0)
+    plt.figure()
+    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    ld.set_t(-10)
+    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    ld.set_t(10)
+    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
     plt.legend()
-    plt.xlabel('Theta [rad]')
-    plt.ylabel('n(t;lE,Omega)')
-    plt.show()
-
-    fig = plt.figure()
-    qd.set_schema('b')
-    qd.set_lE(np.log(1.))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 MeV B')
-    qd.set_lE(np.log(5.))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='5 MeV B')
-    qd.set_lE(np.log(30.))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='30 MeV B')
-    qd.set_lE(np.log(170.))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='170 MeV B')
-    qd.set_lE(np.log(1.e3))
-    plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 GeV B')
     plt.loglog()
-    plt.xlim(ll,ul)
+    plt.xlabel('X (Moliere Units)')
+    plt.ylabel('n_t_lX')
+
+    r = np.logspace(-3,3,100)
+    plt.figure()
+    ld.set_t(0.)
+    plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
+    ld.set_t(-10.)
+    plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
+    ld.set_t(10.)
+    plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
     plt.legend()
-    plt.xlabel('Theta [rad]')
-    plt.ylabel('n(t;lE,Omega)')
+    plt.xlabel('distance from core (m)')
+    plt.ylabel('density (particles/m^2)')
+
+    # ll = np.radians(0.1)
+    # ul = np.radians(45.)
+    # lqrad = np.linspace(np.log(ll),np.log(ul),450)
+    # qrad = np.exp(lqrad)
+    #
+    # fig = plt.figure()
+    # qd = AngularDistribution(np.log(1.),'l')
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 MeV')
+    # qd.set_lE(np.log(5.))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='5 MeV')
+    # qd.set_lE(np.log(30.))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='30 MeV')
+    # qd.set_lE(np.log(170.))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='170 MeV')
+    # qd.set_lE(np.log(1.e3))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 GeV')
+    # plt.loglog()
+    # plt.legend()
+    # plt.xlabel('Theta [rad]')
+    # plt.ylabel('n(t;lE,Omega)')
+    # plt.show()
+    #
+    # fig = plt.figure()
+    # qd.set_schema('b')
+    # qd.set_lE(np.log(1.))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 MeV B')
+    # qd.set_lE(np.log(5.))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='5 MeV B')
+    # qd.set_lE(np.log(30.))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='30 MeV B')
+    # qd.set_lE(np.log(170.))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='170 MeV B')
+    # qd.set_lE(np.log(1.e3))
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 GeV B')
+    # plt.loglog()
+    # plt.xlim(ll,ul)
+    # plt.legend()
+    # plt.xlabel('Theta [rad]')
+    # plt.ylabel('n(t;lE,Omega)')
