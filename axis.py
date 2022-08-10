@@ -368,20 +368,114 @@ class MakeFlatCounters(Counters):
         (# of counters, # of axis points)'''
         return self.area(axis_vectors) / (self.travel_length(axis_vectors)**2)
 
-def distribute_nch(Nch: float, r: np.ndarray, sig: float = .6) -> np.ndarray:
+class LateralSpread:
+    '''This class interacts with the table of NKG universal lateral distributions
+    '''
+    drho_dN = np.load('drho_dN_of_t_d_r.npz')
+    t = drho_dN['ts']
+    d = drho_dN['ds']
+    r = drho_dN['rs']
+    drho_dN_of_t_d_r = drho_dN['drho_dN_of_t_d_r']
+
+    @classmethod
+    def get_t_index(self, input_t):
+        '''This method returns the index of the stage in the table closest to
+        the input stage.
+        '''
+        return np.abs(input_t - self.t).argmin()
+
+    @classmethod
+    def get_d_index(self, input_d):
+        '''This method returns the index of the density in the table closest to
+        the input density.
+        '''
+        return np.abs(input_d - self.d).argmin()
+
+    @classmethod
+    def drho_dN_at_t_d(self, input_t: float, input_d: float) -> np.ndarray:
+        '''This method returns a rank 2 numpy array of the fractional particle
+        density as a function of radius from the core.
+
+        Parameters:
+        input_t: input stage
+        input_d: input atmospheric density (kg / m^3)
+
+        returns:
+        fractional density as a function of r at input stage & density
+        '''
+        return self.drho_dN_of_t_d_r[self.get_t_index(input_t),self.get_d_index(input_d)]
+
+    @classmethod
+    def drho_dN_at_t_d_of_r(self, input_rs: np.ndarray, input_t: float, input_d: float) -> np.ndarray:
+        '''This method returns the interpolated value of drho_dN.
+
+        Parameters:
+        input_rs: array of input radii (m) (from the mesh)
+        input_t: input stage
+        input_d: input atmospheric density (kg / m^3)
+
+        returns:
+        drho_dN values (at input stage and density) at the input radii
+        '''
+        return np.interp(input_rs, self.r, self.drho_dN_at_t_d(input_t,input_d))
+
+# def distribute_nch(Nch: float, r: np.ndarray, sig: float = .6) -> np.ndarray:
+#     '''This method assigns charged particles to the points in the mesh according to how
+#     far they are from the shower axis.
+#     Parameters:
+#     Nch = number of charged particles
+#     r = array of distances away from the axis
+#     sig = sigma to be used with the normal distribution
+#     returns: an array of the number of charged particles associated with each r
+#     same shape as r
+#     '''
+#     scaler = r / r.max()
+#     nch_scaler = norm.pdf(scaler, scale = sig)
+#     nch_scaler /= nch_scaler.sum()
+#     return nch_scaler * Nch
+
+def distribute_nch(Nch: float, r: np.ndarray, t: float, d: float) -> np.ndarray:
     '''This method assigns charged particles to the points in the mesh according to how
     far they are from the shower axis.
     Parameters:
     Nch = number of charged particles
     r = array of distances away from the axis
-    sig = sigma to be used with the normal distribution
+    t: input stage
+    d: input atmospheric density (kg / m^3)
+
     returns: an array of the number of charged particles associated with each r
     same shape as r
     '''
-    scaler = r / r.max()
-    nch_scaler = norm.pdf(scaler, scale = sig)
-    nch_scaler /= nch_scaler.sum()
-    return nch_scaler * Nch
+    drho_dN = LateralSpread.drho_dN_at_t_d_of_r(r, t, d)
+    drho_dN /= drho_dN.sum()
+    return Nch * drho_dN
+
+def n_in_mesh(t: np.ndarray) -> np.ndarray:
+    '''This function calculates the number of points on one side of the mesh.
+    '''
+    side = np.empty_like(t)
+    i_before = np.array(t<=-10.)
+    side[i_before] = 1
+    side[~i_before] = 30
+    return side
+
+def mesh_width(nch: np.ndarray) -> np.ndarray:
+    # width = 50 * nch / nch.max()
+    # width[width<10.] = 10.
+    width = np.empty_like(nch)
+    width[:] = 15.
+    return width
+
+def mesh_side(n: int, width: float) -> np.ndarray:
+    '''This function calculates the coordinates of one side of the mesh
+    '''
+    if n == 1:
+        return 0.
+    else:
+        return np.linspace(-width,width,n)
+        # pos_side = np.linspace(1.,width,n)
+        # return np.concatenate((-pos_side[::-1],pos_side))
+
 
 def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     '''This function takes an shower axis and creates a 3d mesh of points around
@@ -403,16 +497,20 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     total_nch[total_nch == 0] = 1.e-10
     axis_t = shower.stage(axis.X)
     axis_d = axis.delta
+    axis_density = axis.density
     axis_dr = axis.dr
     axis_altitude = axis.altitude
     r = axis.r
-    frac_of_max = total_nch / shower.N_max
-    # max_width = 1000 * frac_of_max
-    shifted_stage = axis_t - axis_t.min()
-    max_width = shifted_stage * (600 / shifted_stage.max()) + 1.
+    # max_width = 100 * frac_of_max
+    # shifted_stage = axis_t - axis_t.min()
+    # max_width = shifted_stage * (150 / shifted_stage.max())
+    # max_width_power = shifted_stage * (2 / shifted_stage.max())
+    # max_width_power = 3 * frac_of_max
+    # min_width_power = 1.2
     # frac_of_max = shifted_stage  / shifted_stage.max()
-    n_in_mesh = 2 * np.ceil(5 * frac_of_max) + 1.
-    n_in_mesh[n_in_mesh == 0.] = 2.
+    # n_in_mesh = 2 * np.ceil(5 * frac_of_max)
+    nmesh = n_in_mesh(axis_t)
+    mwidth = mesh_width(total_nch)
     x = []
     y = []
     z = []
@@ -421,10 +519,13 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     nch = []
     dr = []
     a = []
-    for i, n in enumerate(n_in_mesh):
-        side = np.linspace(-max_width[i], max_width[i], int(n))
+    for i, n in enumerate(nmesh):
+        # side = np.linspace(-max_width[i], max_width[i], int(n))
+        # pos_side = np.logspace(min_width_power, max_width_power[i], int(n))
+        # side = np.concatenate((-pos_side[::-1], pos_side))
+        side = mesh_side(int(n), mwidth[i])
         xx, yy = np.meshgrid(side, side)
-        nch.extend(distribute_nch(total_nch[i], (xx**2 + yy**2).flatten()).tolist())
+        nch.extend(distribute_nch(total_nch[i], (xx**2 + yy**2).flatten(), axis_t[i], axis_density[i]).tolist())
         x.extend(xx.flatten().tolist())
         y.extend(yy.flatten().tolist())
         z.extend(np.full((xx.size), r[i]).tolist())
