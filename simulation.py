@@ -266,7 +266,7 @@ class ShowerSimulation:
                 return False
         return True
 
-    def run(self, mesh: bool = True):
+    def run(self, mesh: bool = False):
         '''This is the proprietary run method which creates the arrays of
         Signal, Timing, and Attenuation objects
         '''
