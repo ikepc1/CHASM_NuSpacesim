@@ -188,34 +188,7 @@ class Axis(ABC):
         '''This method should return the specific attenuation factory needed for
         the specific axis type (up or down)
         '''
-
-class LateralSpread:
-    '''This class interacts with the table of NKG universal lateral distributions
-    '''
-    Moliere_data = np.load('lateral.npz')
-    t_Moliere = Moliere_data['t']
-    AVG_Moliere = Moliere_data['avg']
-
-    @classmethod
-    def rms_moliere(cls, shower: Shower, axis: Axis) -> np.ndarray:
-        '''This method returns the average lateral spread in Moliere units as a
-        function of stage
-        '''
-        return np.interp(shower.stage(axis.X), cls.t_Moliere, cls.AVG_Moliere)
-
-    @staticmethod
-    def moliere_radius(axis: Axis) -> np.ndarray:
-        '''This method returns the Moliere radius at each step along the axis
-        '''
-        return 96. / axis.density
-
-    @classmethod
-    def rms_width(cls, shower: Shower, axis: Axis) -> np.ndarray:
-        '''This method returns the average spatial spread of charged particles
-        in a shower along an axis
-        '''
-        return cls.rms_moliere(shower, axis) * cls.moliere_radius(axis)
-
+        
 def vector_magnitude(vectors: np.ndarray):
     '''This method computes the length of an array of vectors'''
     return np.sqrt((vectors**2).sum(axis = -1))
