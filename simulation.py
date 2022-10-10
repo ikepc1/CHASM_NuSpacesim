@@ -385,10 +385,10 @@ if __name__ == '__main__':
 
     # theta = np.linspace(.01, np.radians(80),100)
     # phi = np.linspace(0, 1.999*np.pi, 10)
-    theta = np.radians(5)
+    theta = np.radians(50)
     phi = np.radians(135)
 
-    x = np.linspace(-1000,1000,10)
+    x = np.linspace(-1000,1000,100)
     xx, yy = np.meshgrid(x,x)
     counters = np.empty([xx.size,3])
     counters[:,0] = xx.flatten()
@@ -411,24 +411,24 @@ if __name__ == '__main__':
     ax.set_aspect('equal')
     plt.colorbar(label = 'Number of Cherenkov Photons')
 
-    axis =  sim.ingredients['axis'][0,0]
-    shower = sim.ingredients['shower'][0]
-    counters = sim.ingredients['counters'][0]
-    y = sim.ingredients['yield']
-    ma = MeshAxis(axis, shower)
-    ms = MeshShower(ma)
-    # mesh_axis, r, t, d = axis_to_mesh(axis,shower)
-    # rotated_mesh_axis = rotate_mesh(mesh_axis, axis.zenith, axis.azimuth)
-    ax = fig.add_axes([0, 0, 1, 1], projection='3d')
-    ax.scatter(ma.mesh[:,0],ma.mesh[:,1],ma.mesh[:,2],s=.1)
-    ax.scatter(ma.vectors[:,0],ma.vectors[:,1],ma.vectors[:,2],c=ma.nch/ma.nch.max())
-    ax.scatter(axis.vectors[:,0],axis.vectors[:,1],axis.vectors[:,2],s=.5)
-    ax.set_xlim(-1000,1000)
-    ax.set_ylim(-1000,1000)
-    ax.set_zlim(0,6000)
-    ax.set_xlabel('x (m)')
-    ax.set_ylabel('y (m)')
-    ax.set_zlabel('z (m)')
+    # axis =  sim.ingredients['axis'][0,0]
+    # shower = sim.ingredients['shower'][0]
+    # counters = sim.ingredients['counters'][0]
+    # y = sim.ingredients['yield']
+    # ma = MeshAxis(axis, shower)
+    # ms = MeshShower(ma)
+    # # mesh_axis, r, t, d = axis_to_mesh(axis,shower)
+    # # rotated_mesh_axis = rotate_mesh(mesh_axis, axis.zenith, axis.azimuth)
+    # ax = fig.add_axes([0, 0, 1, 1], projection='3d')
+    # ax.scatter(ma.rotated_mesh[:,0],ma.rotated_mesh[:,1],ma.rotated_mesh[:,2],s=.1)
+    # ax.scatter(ma.vectors[:,0],ma.vectors[:,1],ma.vectors[:,2],c=ma.nch/ma.nch.max())
+    # ax.scatter(axis.vectors[:,0],axis.vectors[:,1],axis.vectors[:,2],s=.5)
+    # ax.set_xlim(-1000,1000)
+    # ax.set_ylim(-1000,1000)
+    # ax.set_zlim(0,6000)
+    # ax.set_xlabel('x (m)')
+    # ax.set_ylabel('y (m)')
+    # ax.set_zlabel('z (m)')
 
 
     # counters = np.empty([100,3])
