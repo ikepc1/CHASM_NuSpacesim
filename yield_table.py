@@ -78,7 +78,7 @@ class GammaYield:
         return quad(self.avg_yield_integrand, ll, ul, args = (ed, delta))[0]
 
 class YieldTable:
-    cpa = CherenkovPhotonArray('gg_t_delta_theta_mc.npz')
+    cpa = CherenkovPhotonArray('gg_t_delta_theta_doubled.npz')
     delta = cpa.delta
     gy = GammaYield()
     ed = EnergyDistribution('Tot', 0)
@@ -95,4 +95,5 @@ class YieldTable:
                 self.y_t_delta[i,j] = self.gy.avg_yield_integral(ed,d)
         np.savez('y_t_delta.npz', y_t_delta = self.y_t_delta, t=self.t, d=self.delta)
 
-yt = YieldTable(1000)
+if __name__ == 'main':
+    yt = YieldTable(1000)

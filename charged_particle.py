@@ -395,6 +395,9 @@ class LateralDistributionNKG:
         X = np.exp(lX)
         return self.n_t_lX_of_X(X)
 
+    def N_t_lX(self,lX):
+        return self.n_t_lX(lX) / np.exp(lX)#**2
+
     def set_t(self,t):
         self.t = t
         self.normalize(t)
@@ -454,38 +457,52 @@ class LateralDistributionNKG:
                 drho_dN_of_t_d_r[i,j] = self.d_rho_dA_of_r_d(rs, d)
         return ts, ds, rs, drho_dN_of_t_d_r
 
+    def make_lX_table(self):
+        ts = np.linspace(-20.,20.,1000)
+        # lXs = np.array([-3.5,-2.5,-1.5,-.5,.5])
+        # lXs = np.arange(-4,1)
+        lX_intervals = np.linspace(-6,2,15)
+        lXs = (lX_intervals + (np.diff(lX_intervals)/2)[0])[:-1]
+        n_t_lX_of_t_lX = np.empty((ts.size,lXs.size),dtype=float)
+        for i, t in enumerate(ts):
+            self.set_t(t)
+            n_t_lX_of_t_lX[i] = self.N_t_lX(lXs) / self.N_t_lX(lXs).sum()
+        np.savez('n_t_lX_of_t_lX.npz',n_t_lX_of_t_lX=n_t_lX_of_t_lX,ts=ts,lXs=lXs)
+
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    plt.ion()
-    atm = Atmosphere()
-    d = atm.density(0.)
-
-    x = np.logspace(-3,2,100)
-    lx = np.log(x)
     ld = LateralDistributionNKG(0)
-    plt.figure()
-    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
-    ld.set_t(-10)
-    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
-    ld.set_t(10)
-    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
-    plt.legend()
-    plt.loglog()
-    plt.xlabel('X (Moliere Units)')
-    plt.ylabel('n_t_lX')
-
-    r = np.logspace(-3,3,100)
-    plt.figure()
-    ld.set_t(0.)
-    plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
-    ld.set_t(-10.)
-    plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
-    ld.set_t(10.)
-    plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
-    plt.legend()
-    plt.xlabel('distance from core (m)')
-    plt.ylabel('density (particles/m^2)')
+    ld.make_lX_table()
+    # import matplotlib.pyplot as plt
+    # plt.ion()
+    # atm = Atmosphere()
+    # d = atm.density(0.)
+    #
+    # x = np.logspace(-3,2,100)
+    # lx = np.log(x)
+    # ld = LateralDistributionNKG(0)
+    # plt.figure()
+    # plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    # ld.set_t(-10)
+    # plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    # ld.set_t(10)
+    # plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    # plt.legend()
+    # plt.loglog()
+    # plt.xlabel('X (Moliere Units)')
+    # plt.ylabel('n_t_lX')
+    #
+    # r = np.logspace(-3,3,100)
+    # plt.figure()
+    # ld.set_t(0.)
+    # plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
+    # ld.set_t(-10.)
+    # plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
+    # ld.set_t(10.)
+    # plt.plot(r, ld.d_rho_dA_of_r_d(r, d), label = f"t = {ld.t}")
+    # plt.legend()
+    # plt.xlabel('distance from core (m)')
+    # plt.ylabel('density (particles/m^2)')
 
     # ll = np.radians(0.1)
     # ul = np.radians(45.)

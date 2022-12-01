@@ -1,8 +1,76 @@
 import numpy as np
 from scipy.integrate import quad
 from scipy.constants import Avogadro
+from abc import ABC, abstractmethod
 
-class Atmosphere:
+class Atmosphere(ABC):
+    '''This is the abstract base class for creating atmosphere objects. It
+    contains the necessary methods related to the atmosphere for use in the
+    rest of CHASM.
+    '''
+
+    @abstractmethod
+    def temperature(self,h):
+        """
+        This function returns temperature as a function of height.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            T - temperature [K]
+        """
+
+    @abstractmethod
+    def pressure(self,h):
+        """
+        This function returns pressure as a function of height.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            P - pressure [Pa]
+        """
+
+    @abstractmethod
+    def density(self,h):
+        """
+        This function returns density as a function of height.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            rho - density [kg/m3]
+        """
+
+    @abstractmethod
+    def number_density(self,h):
+        '''
+        This method returns the approximate number density of air molecules as
+        a function of height.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            N - number density [N/m3]
+        '''
+
+    @abstractmethod
+    def delta(self,h):
+        """
+        This function returns the difference of the index-of-refraction from unity.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            delta - equal to n - 1.
+        """
+
+class USStandardAtmosphere(Atmosphere):
     """
     Class containing constants and methods for using the US Standard Atmosphere of 1976
 

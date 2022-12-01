@@ -1,6 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from atmosphere import Atmosphere
+from atmosphere import *
 from scipy.constants import value,nano
 from scipy.spatial.transform import Rotation as R
 from generate_Cherenkov import MakeYield
@@ -12,7 +12,8 @@ class Axis(ABC):
     the cartesian vectors and corresponding slant depths of an air shower'''
 
     earth_radius = 6.371e6 #meters
-    atm = Atmosphere()
+    lX = -100. #This is the default value for the distance to the axis in log moliere units (in this case log(-inf) = 0, or on the axis)
+    atm = USStandardAtmosphere()
 
     def __init__(self, zenith: float, azimuth: float, ground_level: float = 0.):
         self.zenith = zenith
@@ -79,13 +80,18 @@ class Axis(ABC):
 
     @property
     def delta(self):
-        '''delta property definition'''
+        '''delta property definition (index of refraction - 1)'''
         return self.atm.delta(self.altitude)
 
     @property
     def density(self):
-        '''Axis density property definition'''
+        '''Axis density property definition (kg/m^3)'''
         return self.atm.density(self.altitude)
+
+    @property
+    def moliere_radius(self):
+        '''Moliere radius property definition (m)'''
+        return 96. / self.density
 
     def h_to_axis_R_LOC(self,h,theta):
         '''Return the length along the shower axis from the point of Earth
@@ -188,7 +194,15 @@ class Axis(ABC):
         '''This method should return the specific attenuation factory needed for
         the specific axis type (up or down)
         '''
-        
+
+    @abstractmethod
+    def get_gg_file(self):
+        '''This method should return the gg array for the particular axis type.
+        For linear axes, it should return the regular gg array. For a mesh axis,
+        it should return the gg array for the axis' particular log(moliere)
+        interval.
+        '''
+
 def vector_magnitude(vectors: np.ndarray):
     '''This method computes the length of an array of vectors'''
     return np.sqrt((vectors**2).sum(axis = -1))
@@ -230,6 +244,11 @@ class Counters(ABC):
             self._input_radius = input_value
         else:
             raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
+
+    @property
+    def N_counters(self):
+        '''Number of counters.'''
+        return self.vectors.shape[0]
 
     @property
     def r(self):
@@ -344,113 +363,84 @@ class MakeFlatCounters(Counters):
 class LateralSpread:
     '''This class interacts with the table of NKG universal lateral distributions
     '''
-    drho_dN = np.load('drho_dN_of_t_d_r.npz')
-    t = drho_dN['ts']
-    d = drho_dN['ds']
-    r = drho_dN['rs']
-    drho_dN_of_t_d_r = drho_dN['drho_dN_of_t_d_r']
+    lx_table = np.load('n_t_lX_of_t_lX.npz')
+    t = lx_table['ts']
+    lX = lx_table['lXs']
+    n_t_lX_of_t_lX = lx_table['n_t_lX_of_t_lX']
 
     @classmethod
-    def get_t_index(self, input_t):
-        '''This method returns the index of the stage in the table closest to
-        the input stage.
+    def get_t_indices(cls, input_t: np.ndarray):
+        '''This method returns the indices of the stages in the table closest to
+        the input stages.
         '''
-        return np.abs(input_t - self.t).argmin()
+        return np.abs(input_t[:, np.newaxis] - cls.t).argmin(axis=1)
 
     @classmethod
-    def get_d_index(self, input_d):
-        '''This method returns the index of the density in the table closest to
-        the input density.
+    def get_lX_index(cls, input_lX: float):
+        '''This method returns the index closest to the input lX within the 5
+        tabulated lX values.
         '''
-        return np.abs(input_d - self.d).argmin()
+        return np.abs(input_lX - cls.lX).argmin()
 
     @classmethod
-    def drho_dN_at_t_d(self, input_t: float, input_d: float) -> np.ndarray:
-        '''This method returns a rank 2 numpy array of the fractional particle
-        density as a function of radius from the core.
-
-        Parameters:
-        input_t: input stage
-        input_d: input atmospheric density (kg / m^3)
-
-        returns:
-        fractional density as a function of r at input stage & density
+    def nch_fractions(cls, input_ts: np.ndarray, input_lX: float):
+        '''This method returns the fraction of charged particles at distance
+        exp(lX) moliere units from the shower axis at an array of stages
+        (input_ts).
         '''
-        return self.drho_dN_of_t_d_r[self.get_t_index(input_t),self.get_d_index(input_d)]
+        t_indices = cls.get_t_indices(input_ts)
+        lX_index = cls.get_lX_index(input_lX)
+        return cls.n_t_lX_of_t_lX[t_indices,lX_index]
 
-    @classmethod
-    def drho_dN_at_t_d_of_r(self, input_rs: np.ndarray, input_t: float, input_d: float) -> np.ndarray:
-        '''This method returns the interpolated value of drho_dN.
-
-        Parameters:
-        input_rs: array of input radii (m) (from the mesh)
-        input_t: input stage
-        input_d: input atmospheric density (kg / m^3)
-
-        returns:
-        drho_dN values (at input stage and density) at the input radii
-        '''
-        return np.interp(input_rs, self.r, self.drho_dN_at_t_d(input_t,input_d))
-
-# def distribute_nch(Nch: float, r: np.ndarray, sig: float = .6) -> np.ndarray:
-#     '''This method assigns charged particles to the points in the mesh according to how
-#     far they are from the shower axis.
-#     Parameters:
-#     Nch = number of charged particles
-#     r = array of distances away from the axis
-#     sig = sigma to be used with the normal distribution
-#     returns: an array of the number of charged particles associated with each r
-#     same shape as r
-#     '''
-#     scaler = r / r.max()
-#     nch_scaler = norm.pdf(scaler, scale = sig)
-#     nch_scaler /= nch_scaler.sum()
-#     return nch_scaler * Nch
-
-def distribute_nch(Nch: float, r: np.ndarray, t: float, d: float) -> np.ndarray:
-    '''This method assigns charged particles to the points in the mesh according to how
-    far they are from the shower axis.
-    Parameters:
-    Nch = number of charged particles
-    r = array of distances away from the axis
-    t: input stage
-    d: input atmospheric density (kg / m^3)
-
-    returns: an array of the number of charged particles associated with each r
-    same shape as r
+class LateralCherenkovProduction:
+    '''This class interacts with the table of Cherenkov production fractions as
+    a function of log(Moliere).
     '''
-    drho_dN = LateralSpread.drho_dN_at_t_d_of_r(r, t, d)
-    drho_dN /= drho_dN.sum()
-    return Nch * drho_dN
+    lx_table = np.load('dY_dlX_of_t_d.npz')
+    t = lx_table['ts']
+    d = lx_table['ds']
+    lX = lx_table['lXs']
+    dY_dlX_of_t_d= lx_table['dY_dlX_of_t_d']
 
-def n_in_mesh(t: np.ndarray) -> np.ndarray:
-    '''This function calculates the number of points on one side of the mesh.
-    '''
-    side = np.empty_like(t)
-    i_before = np.array(t<=-10.)
-    side[i_before] = 1
-    side[~i_before] = 30
-    return side
+    @classmethod
+    def get_t_indices(cls, input_t: np.ndarray):
+        '''This method returns the indices of the stages in the table closest to
+        the input stages.
+        '''
+        return np.abs(input_t[:, np.newaxis] - cls.t).argmin(axis=1)
 
-def mesh_width(nch: np.ndarray) -> np.ndarray:
-    # width = 50 * nch / nch.max()
-    # width[width<10.] = 10.
-    width = np.empty_like(nch)
-    width[:] = 15.
-    return width
+    @classmethod
+    def get_d_indices(cls, input_d: float):
+        '''This method returns the index closest to the input delta within the
+        tabulated delta values.
+        '''
+        return np.abs(input_d[:, np.newaxis] - cls.d).argmin(axis=1)
 
-def mesh_side(n: int, width: float) -> np.ndarray:
-    '''This function calculates the coordinates of one side of the mesh
-    '''
-    if n == 1:
-        return 0.
-    else:
-        return np.linspace(-width,width,n)
-        # pos_side = np.linspace(1.,width,n)
-        # return np.concatenate((-pos_side[::-1],pos_side))
+    @classmethod
+    def get_lX_index(cls, input_lX: float):
+        '''This method returns the index closest to the input lX within the 5
+        tabulated lX values.
+        '''
+        return np.abs(input_lX - cls.lX).argmin()
 
+    @classmethod
+    def nch_fractions(cls, input_ts: np.ndarray, input_ds: np.ndarray, input_lX: float):
+        '''This method returns the fraction of charged particles at distance
+        exp(lX) moliere units from the shower axis at an array of stages
+        (input_ts).
+        '''
+        t_indices = cls.get_t_indices(input_ts)
+        d_indices = cls.get_d_indices(input_ds)
+        lX_index = cls.get_lX_index(input_lX)
+        return cls.dY_dlX_of_t_d[t_indices, d_indices, lX_index]
 
-def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
+# lX_fractions = {-3.5 : .67,
+#                 -2.5 : .3,
+#                 -1.5 : .02,
+#                 -.5 : .005,
+#                 .5 : .005}
+
+def axis_to_mesh(lX: float, axis: Axis, shower: Shower, N_ring: int = 20) -> tuple:
     '''This function takes an shower axis and creates a 3d mesh of points around
     the axis (in coordinates where the axis is the z-axis)
     Parameters:
@@ -466,47 +456,28 @@ def axis_to_mesh(axis: Axis, shower: Shower) -> tuple:
     The corresponding array of altitudes (for timing calcs)
 
     '''
-    total_nch = shower.profile(axis.X)
-    total_nch[total_nch == 0] = 1.e-10
+    X = np.exp(lX) #number of moliere units for the radius of the ring
+    X_to_m = X * axis.moliere_radius
     axis_t = shower.stage(axis.X)
+    total_nch = shower.profile(axis.X) * LateralSpread.nch_fractions(axis_t,lX)
+    # total_nch = shower.profile(axis.X) * lX_fractions[lX]
     axis_d = axis.delta
-    axis_density = axis.density
+    # total_nch = shower.profile(axis.X) * LateralCherenkovProduction.nch_fractions(axis_t,axis_d,lX)
     axis_dr = axis.dr
     axis_altitude = axis.altitude
     r = axis.r
-    # max_width = 100 * frac_of_max
-    # shifted_stage = axis_t - axis_t.min()
-    # max_width = shifted_stage * (150 / shifted_stage.max())
-    # max_width_power = shifted_stage * (2 / shifted_stage.max())
-    # max_width_power = 3 * frac_of_max
-    # min_width_power = 1.2
-    # frac_of_max = shifted_stage  / shifted_stage.max()
-    # n_in_mesh = 2 * np.ceil(5 * frac_of_max)
-    nmesh = n_in_mesh(axis_t)
-    mwidth = mesh_width(total_nch)
-    x = []
-    y = []
-    z = []
-    t = []
-    d = []
-    nch = []
-    dr = []
-    a = []
-    for i, n in enumerate(nmesh):
-        # side = np.linspace(-max_width[i], max_width[i], int(n))
-        # pos_side = np.logspace(min_width_power, max_width_power[i], int(n))
-        # side = np.concatenate((-pos_side[::-1], pos_side))
-        side = mesh_side(int(n), mwidth[i])
-        xx, yy = np.meshgrid(side, side)
-        nch.extend(distribute_nch(total_nch[i], (xx**2 + yy**2).flatten(), axis_t[i], axis_density[i]).tolist())
-        x.extend(xx.flatten().tolist())
-        y.extend(yy.flatten().tolist())
-        z.extend(np.full((xx.size), r[i]).tolist())
-        t.extend(np.full((xx.size), axis_t[i]).tolist())
-        d.extend(np.full((xx.size), axis_d[i]).tolist())
-        dr.extend(np.full((xx.size), axis_dr[i]).tolist())
-        a.extend(np.full((xx.size), axis_altitude[i]).tolist())
-    return np.array((x,y,z)).T, np.array(nch), np.array(t), np.array(d), np.array(dr), np.array(a)
+    ring_theta = np.arange(0,N_ring) * 2 * np.pi / N_ring
+    ring_x = X_to_m[:, np.newaxis] * np.cos(ring_theta)
+    ring_y = X_to_m[:, np.newaxis] * np.sin(ring_theta)
+    x = ring_x.flatten()
+    y = ring_y.flatten()
+    z = np.repeat(r, N_ring)
+    t = np.repeat(axis_t, N_ring)
+    d = np.repeat(axis_d, N_ring)
+    nch = np.repeat(total_nch / N_ring, N_ring)
+    dr = np.repeat(axis_dr, N_ring)
+    a = np.repeat(axis_altitude, N_ring)
+    return np.array((x,y,z)).T, nch, t, d, dr, a
 
 def rotate_mesh(mesh: np.ndarray, theta: float, phi: float) -> np.ndarray:
     '''This function rotates an array of vectors by polar angle theta and
@@ -532,15 +503,32 @@ class MeshAxis(Axis):
     '''This class is the implementation of an axis where the sampled points are
     spread into a mesh.
     '''
+    lXs = np.arange(-4,1)
 
-    def __init__(self, linear_axis: Axis, shower: Shower):
+    def __init__(self, lX_interval: tuple, linear_axis: Axis, shower: Shower):
+        self.lX_interval = lX_interval
+        self.lX = np.mean(lX_interval)
         self.linear_axis = linear_axis
         self.shower = shower
         self.zenith = linear_axis.zenith
         self.azimuth = linear_axis.azimuth
         self.ground_level = linear_axis.ground_level
-        mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.linear_axis, self.shower)
+        mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.lX, self.linear_axis, self.shower)
         self.rotated_mesh = rotate_mesh(mesh, linear_axis.zenith, linear_axis.azimuth)
+
+    @property
+    def lX_inteval(self):
+        '''lX_inteval property getter'''
+        return self._lX_inteval
+
+    @lX_inteval.setter
+    def lX_inteval(self, interval):
+        '''lX_inteval angle property setter'''
+        # if type(interval) != tuple:
+        #     raise ValueError('lX interval needs to be a tuple')
+        # if interval not in zip(self.lXs[:-1], self.lXs[1:]):
+        #     raise ValueError('lX interval not in tabulated ranges.')
+        self._lX_inteval = interval
 
     @property
     def delta(self):
@@ -596,6 +584,25 @@ class MeshAxis(Axis):
         the specific axis type (up or down)
         '''
         return self.linear_axis.get_attenuation(axis, counters, y)
+
+    # def get_gg_file(self):
+    #     '''This method returns the gg array file for the axis' particular
+    #     log(moliere) interval.
+    #     '''
+    #     start = self.find_nearest_interval()
+    #     if start < -4:
+    #         return 'gg_t_delta_theta_mc.npz'
+    #     else:
+    #         return f'gg_t_delta_theta_lX_{start}_to_{start+1}.npz'
+
+    def find_nearest_interval(self):
+        return self.lXs[np.abs(self.lX_interval[0]-self.lXs).argmin()]
+
+    def get_gg_file(self):
+        '''This method returns the original gg array file.
+        '''
+        # return 'gg_t_delta_theta_mc.npz'
+        return 'gg_t_delta_theta_2020_normalized.npz'
 
 class MeshShower(Shower):
     '''This class is the implementation of a shower where the shower particles are
@@ -658,6 +665,11 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         axes'''
         return UpwardAttenuation(axis, counters, y)
 
+    def get_gg_file(self):
+        '''This method returns the original gg array file.
+        '''
+        return 'gg_t_delta_theta_mc.npz'
+
 class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
     '''This is the implementation of an upward going shower axis with a flat
     planar atmosphere'''
@@ -679,6 +691,11 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
         return UpwardAttenuationCurved(axis, counters, y)
+
+    def get_gg_file(self):
+        '''This method returns the original gg array file.
+        '''
+        return 'gg_t_delta_theta_mc.npz'
 
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
@@ -724,6 +741,12 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         axes'''
         return DownwardAttenuation(axis, counters, y)
 
+    def get_gg_file(self):
+        '''This method returns the original gg array file.
+        '''
+        return 'gg_t_delta_theta_mc.npz'
+        # return 'gg_t_delta_theta_lX_-2_to_-1.npz'
+
 class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
     '''This is the implementation of a downward going shower axis with a
     curved atmosphere.'''
@@ -746,6 +769,11 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
         return DownwardAttenuationCurved(axis, counters, y)
+
+    def get_gg_file(self):
+        '''This method returns the original gg array file.
+        '''
+        return 'gg_t_delta_theta_mc.npz'
 
 def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray) -> np.ndarray:
     '''This function divides some quantity specified at each atmospheric height
@@ -1015,7 +1043,7 @@ class Attenuation(ABC):
     calculate the fraction of light removed from the signal at each atmospheric
     step.
     '''
-    atm = Atmosphere()
+    atm = USStandardAtmosphere()
     abstable = np.load('abstable.npz')
     ecoeff = abstable['ecoeff']
     l_list = abstable['wavelength']

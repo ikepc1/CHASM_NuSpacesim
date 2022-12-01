@@ -158,7 +158,7 @@ class Yield(Element):
     '''This is the implementation of the yield element'''
     element_type = 'yield'
 
-    def __init__(self, l_min: float, l_max: float, N_bins: int = 10):
+    def __init__(self, l_min: float, l_max: float, N_bins: int = 1):
         self.l_min = l_min
         self.l_max = l_max
         self.N_bins = N_bins
@@ -181,12 +181,14 @@ class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
     given counters
     '''
-    table_file = 'gg_t_delta_theta_doubled.npz'
-    gga = CherenkovPhotonArray(table_file)
+    # table_file = 'gg_t_delta_theta_doubled.npz'
+    # gga = CherenkovPhotonArray(table_file)
 
     def __init__(self, shower: Shower, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.shower = shower
         self.axis = axis
+        self.table_file = axis.get_gg_file()
+        self.gga = CherenkovPhotonArray(self.table_file)
         self.counters = counters
         self.yield_array = yield_array
         self.t = self.shower.stage(self.axis.X)
@@ -222,7 +224,7 @@ class Signal:
         size: (# of axis points)
         '''
         Y = y.y_list(self.t, self.axis.delta)
-        return self.Nch * self.axis.dr * Y
+        return 2. * self.Nch * self.axis.dr * Y
 
     def calculate_ng(self):
         '''This method returns the number of Cherenkov photons going toward
@@ -234,11 +236,16 @@ class Signal:
         gg = self.calculate_gg()
         ng_array = np.empty_like(self.yield_array, dtype='O')
         for i, y in enumerate(self.yield_array):
+            y.set_yield_at_lX(self.axis.lX)
             ng_array[i] = gg * self.calculate_yield(y) * self.omega
         return ng_array
 
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
+    # lXs = np.arange(-4,1)
+    lXs = np.linspace(-6,2,15)
+    lX_intervals = list(zip(lXs[:-1], lXs[1:]))
+    # lXs = np.linspace(-4,1,5)
 
     def __init__(self):
         self.ingredients = {
@@ -266,29 +273,59 @@ class ShowerSimulation:
                 return False
         return True
 
+    # def run(self, mesh: bool = False):
+    #     '''This is the proprietary run method which creates the arrays of
+    #     Signal, Timing, and Attenuation objects
+    #     '''
+    #     shower = self.ingredients['shower'][0]
+    #     counters = self.ingredients['counters'][0]
+    #     y = self.ingredients['yield']
+    #     axis = self.ingredients['axis']
+    #     self.signals = np.empty_like(self.ingredients['axis'])
+    #     self.times = np.empty_like(self.ingredients['axis'])
+    #     self.attenuations = np.empty_like(self.ingredients['axis'])
+    #     if self.check_ingredients():
+    #         for i in range(axis.shape[0]):
+    #             for j in range(axis.shape[1]):
+    #                 if mesh:
+    #                     a = MeshAxis(axis[i,j],shower)
+    #                     s = MeshShower(a)
+    #                 else:
+    #                     a = axis[i,j]
+    #                     s = shower
+    #                 self.signals[i,j] = Signal(s, a, counters, y)
+    #                 self.times[i,j] = a.get_timing(a, counters)
+    #                 self.attenuations[i,j] = a.get_attenuation(a, counters, y)
+
     def run(self, mesh: bool = False):
         '''This is the proprietary run method which creates the arrays of
         Signal, Timing, and Attenuation objects
         '''
+        if not self.check_ingredients():
+            return None
         shower = self.ingredients['shower'][0]
         counters = self.ingredients['counters'][0]
         y = self.ingredients['yield']
-        axis = self.ingredients['axis']
-        self.signals = np.empty_like(self.ingredients['axis'])
-        self.times = np.empty_like(self.ingredients['axis'])
-        self.attenuations = np.empty_like(self.ingredients['axis'])
-        if self.check_ingredients():
-            for i in range(axis.shape[0]):
-                for j in range(axis.shape[1]):
-                    if mesh:
-                        a = MeshAxis(axis[i,j],shower)
-                        s = MeshShower(a)
-                    else:
-                        a = axis[i,j]
-                        s = shower
-                    self.signals[i,j] = Signal(s, a, counters, y)
-                    self.times[i,j] = a.get_timing(a, counters)
-                    self.attenuations[i,j] = a.get_attenuation(a, counters, y)
+        axis = self.ingredients['axis'][0,0]
+        if mesh:
+            lX_intervals = list(zip(self.lXs[:-1], self.lXs[1:]))
+            self.signals = np.empty((len(lX_intervals),1), dtype = 'O')
+            self.times = np.empty((len(lX_intervals),1), dtype = 'O')
+            self.attenuations = np.empty((len(lX_intervals),1), dtype = 'O')
+            for i, interval in enumerate(lX_intervals):
+                meshaxis = MeshAxis(interval,axis,shower)
+                meshshower = MeshShower(meshaxis)
+                self.signals[i,0] = Signal(meshshower,meshaxis,counters,y)
+                self.times[i,0] = meshaxis.get_timing(meshaxis, counters)
+                self.attenuations[i,0] = meshaxis.get_attenuation(meshaxis, counters,y)
+        else:
+            self.signals = np.empty((1,1), dtype = 'O')
+            self.times = np.empty((1,1), dtype = 'O')
+            self.attenuations = np.empty((1,1), dtype = 'O')
+            self.signals[0,0] = Signal(shower,axis,counters,y)
+            self.times[0,0] = axis.get_timing(axis, counters)
+            self.attenuations[0,0] = axis.get_attenuation(axis, counters,y)
+
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -329,6 +366,18 @@ class ShowerSimulation:
         '''
         return self.get_photons(i,j).sum(axis=1)
 
+    def get_signal_sum(self):
+        sum = np.zeros(self.ingredients['counters'][0].r.size)
+        for i_s in range(self.signals[:,0].size):
+            sum += self.get_photon_sum(i=i_s)
+        return sum
+
+    def get_attenuated_signal_sum(self):
+        sum = np.zeros(self.ingredients['counters'][0].r.size)
+        for i_s in range(self.signals[:,0].size):
+            sum += self.get_attenuated_photon_sum(i=i_s)
+        return sum
+
     def get_times(self, i=0, j=0):
         '''This method returns the time it takes after the shower starts along
         the axis for each photon bin to hit each counter. It is simply calling
@@ -338,6 +387,29 @@ class ShowerSimulation:
         (# of counters, # of axis points)
         '''
         return self.times[i,j].counter_time()
+
+    def get_photon_timebins(self, i_counter, t_min, t_max, N_bins):
+        '''This method takes the arrival times of photons from each lX axis and
+        puths them in the same bins whose edges are defined from t_min to t_max
+        in N_bins intervals.
+        '''
+        hist = np.empty(N_bins)
+        for i_s in range(self.signals[:,0].size):
+            hist += np.histogram(self.get_times(i=i_s)[i_counter],N_bins,(t_min,t_max),weights=self.get_photons(i=i_s)[i_counter])[0]
+        return hist
+
+    def get_signal_times(self):
+        '''This method takes the times at which each photon bunch arrives and
+        combines them into one array.
+        '''
+        N_lX = self.signals[:,0].size
+        N_c = self.ingredients['counters'][0].N_counters
+        times_array = np.zeros((N_c, 1))
+        photons_array = np.zeros_like(times_array)
+        for i_s in range(N_lX):
+            times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
+            photons_array = np.append(photons_array, self.get_photons(i=i_s), axis = 1)
+        return times_array, photons_array
 
     def get_attenuated_photons_array(self, i=0, j=0):
         '''This method returns the attenuated number of photons going from each
@@ -377,6 +449,12 @@ class ShowerSimulation:
         '''
         return self.get_attenuated_photons(i,j).sum(axis=1)
 
+    def get_attenuated_signal_sum(self):
+        sum = np.zeros(self.ingredients['counters'][0].r.size)
+        for i_s in range(self.signals[:,0].size):
+            sum += self.get_attenuated_photon_sum(i=i_s)
+        return sum
+
 
 if __name__ == '__main__':
     import numpy as np
@@ -400,10 +478,10 @@ if __name__ == '__main__':
     sim.add(GHShower(666.,6e7,0.,70.))
     sim.add(FlatCounters(counters, 1.))
     sim.add(Yield(200,205,1))
-    sim.run()
+    sim.run(mesh=True)
 
     fig = plt.figure()
-    h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_photon_sum(),bins=100, cmap=plt.cm.jet)
+    h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_signal_sum(),bins=100, cmap=plt.cm.jet)
     # plt.title('Cherenkov Upward Shower footprint at ~500km')
     plt.xlabel('Counter Plane X-axis (km)')
     plt.ylabel('Counter Plane Y-axis (km)')
