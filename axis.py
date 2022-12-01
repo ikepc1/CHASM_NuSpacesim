@@ -392,54 +392,6 @@ class LateralSpread:
         lX_index = cls.get_lX_index(input_lX)
         return cls.n_t_lX_of_t_lX[t_indices,lX_index]
 
-class LateralCherenkovProduction:
-    '''This class interacts with the table of Cherenkov production fractions as
-    a function of log(Moliere).
-    '''
-    lx_table = np.load('dY_dlX_of_t_d.npz')
-    t = lx_table['ts']
-    d = lx_table['ds']
-    lX = lx_table['lXs']
-    dY_dlX_of_t_d= lx_table['dY_dlX_of_t_d']
-
-    @classmethod
-    def get_t_indices(cls, input_t: np.ndarray):
-        '''This method returns the indices of the stages in the table closest to
-        the input stages.
-        '''
-        return np.abs(input_t[:, np.newaxis] - cls.t).argmin(axis=1)
-
-    @classmethod
-    def get_d_indices(cls, input_d: float):
-        '''This method returns the index closest to the input delta within the
-        tabulated delta values.
-        '''
-        return np.abs(input_d[:, np.newaxis] - cls.d).argmin(axis=1)
-
-    @classmethod
-    def get_lX_index(cls, input_lX: float):
-        '''This method returns the index closest to the input lX within the 5
-        tabulated lX values.
-        '''
-        return np.abs(input_lX - cls.lX).argmin()
-
-    @classmethod
-    def nch_fractions(cls, input_ts: np.ndarray, input_ds: np.ndarray, input_lX: float):
-        '''This method returns the fraction of charged particles at distance
-        exp(lX) moliere units from the shower axis at an array of stages
-        (input_ts).
-        '''
-        t_indices = cls.get_t_indices(input_ts)
-        d_indices = cls.get_d_indices(input_ds)
-        lX_index = cls.get_lX_index(input_lX)
-        return cls.dY_dlX_of_t_d[t_indices, d_indices, lX_index]
-
-# lX_fractions = {-3.5 : .67,
-#                 -2.5 : .3,
-#                 -1.5 : .02,
-#                 -.5 : .005,
-#                 .5 : .005}
-
 def axis_to_mesh(lX: float, axis: Axis, shower: Shower, N_ring: int = 20) -> tuple:
     '''This function takes an shower axis and creates a 3d mesh of points around
     the axis (in coordinates where the axis is the z-axis)
@@ -460,9 +412,7 @@ def axis_to_mesh(lX: float, axis: Axis, shower: Shower, N_ring: int = 20) -> tup
     X_to_m = X * axis.moliere_radius
     axis_t = shower.stage(axis.X)
     total_nch = shower.profile(axis.X) * LateralSpread.nch_fractions(axis_t,lX)
-    # total_nch = shower.profile(axis.X) * lX_fractions[lX]
     axis_d = axis.delta
-    # total_nch = shower.profile(axis.X) * LateralCherenkovProduction.nch_fractions(axis_t,axis_d,lX)
     axis_dr = axis.dr
     axis_altitude = axis.altitude
     r = axis.r
