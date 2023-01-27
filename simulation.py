@@ -3,6 +3,7 @@ from axis import *
 from generate_Cherenkov import *
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
+import eventio
 
 #Wrap eventio for extraction of CORSIKA shower data.
 class EventioWrapper(eventio.IACTFile):
