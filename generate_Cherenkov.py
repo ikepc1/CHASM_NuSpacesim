@@ -34,18 +34,18 @@ class MakeYield:
         else:
             return self.lXs[index-1], self.lXs[index]
 
-    # def get_npz_file(self, lX: float) -> str:
-    #     '''This method returns the gg array file for the axis' particular
-    #     log(moliere) interval.
-    #     '''
-    #     start, end = self.find_nearest_interval(lX)
-    #     return f'y_t_delta_lX_{start}_to_{end}.npz'
+    def get_npz_file(self, lX: float) -> str:
+        '''This method returns the gg array file for the axis' particular
+        log(moliere) interval.
+        '''
+        start, end = self.find_nearest_interval(lX)
+        return f'y_t_delta_lX_{start}_to_{end}.npz'
 
-    def get_npz_file(self, lX: float):
-        # lX_midbin_array = np.array(list(self.npz_files.keys()))
-        # lX_key = lX_midbin_array[np.abs(lX - lX_midbin_array).argmin()]
-        # return self.npz_files[lX_key]
-        return 'y_t_delta.npz'
+    # def get_npz_file(self, lX: float):
+    #     # lX_midbin_array = np.array(list(self.npz_files.keys()))
+    #     # lX_key = lX_midbin_array[np.abs(lX - lX_midbin_array).argmin()]
+    #     # return self.npz_files[lX_key]
+    #     return 'y_t_delta.npz'
 
     def set_yield_attributes(self, file: str):
         y = np.load(file)
