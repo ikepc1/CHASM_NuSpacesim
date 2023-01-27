@@ -379,7 +379,7 @@ class USStandardAtmosphere(Atmosphere):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     plt.ion()
-    us77 = Atmosphere()
+    us77 = USStandardAtmosphere()
     h = np.linspace(0,100000,101)
     T,P,rho = us77.atmosphere(h)
     X = us77.depth(h)

@@ -5,12 +5,14 @@ from cherenkov_photon_array import CherenkovPhotonArray
 
 class MakeYield:
     '''This class interacts with the table of Cherenkov yield ratios'''
-    npz_files = {-3.5 : 'y_t_delta_lX_-4_to_-3.npz',
-                 -2.5 : 'y_t_delta_lX_-3_to_-2.npz',
-                 -1.5 : 'y_t_delta_lX_-2_to_-1.npz',
-                 -.5 : 'y_t_delta_lX_-1_to_0.npz',
-                 .5 : 'y_t_delta_lX_0_to_1.npz',
-                 -100. : 'y_t_delta.npz'}
+    # npz_files = {-3.5 : 'y_t_delta_lX_-4_to_-3.npz',
+    #              -2.5 : 'y_t_delta_lX_-3_to_-2.npz',
+    #              -1.5 : 'y_t_delta_lX_-2_to_-1.npz',
+    #              -.5 : 'y_t_delta_lX_-1_to_0.npz',
+    #              .5 : 'y_t_delta_lX_0_to_1.npz',
+    #              -100. : 'y_t_delta.npz'}
+
+    lXs = np.arange(-6,0)
 
     def __init__(self, l_min: float, l_max: float, npzfile = 'y_t_delta.npz'):
         self.l_min = l_min
@@ -22,9 +24,26 @@ class MakeYield:
         return "Yield(l_min={:.2f} nm, l_max={:.2f} nm)".format(
         self.l_min, self.l_max)
 
+    def find_nearest_interval(self, lX: float) -> tuple:
+        '''This method returns the start and end points of the lX interval that
+        the mesh falls within.
+        '''
+        index = np.searchsorted(self.lXs[:-1], lX)
+        if index == 0:
+            return self.lXs[0], self.lXs[1]
+        else:
+            return self.lXs[index-1], self.lXs[index]
+
+    # def get_npz_file(self, lX: float) -> str:
+    #     '''This method returns the gg array file for the axis' particular
+    #     log(moliere) interval.
+    #     '''
+    #     start, end = self.find_nearest_interval(lX)
+    #     return f'y_t_delta_lX_{start}_to_{end}.npz'
+
     def get_npz_file(self, lX: float):
-        lX_midbin_array = np.array(list(self.npz_files.keys()))
-        lX_key = lX_midbin_array[np.abs(lX - lX_midbin_array).argmin()]
+        # lX_midbin_array = np.array(list(self.npz_files.keys()))
+        # lX_key = lX_midbin_array[np.abs(lX - lX_midbin_array).argmin()]
         # return self.npz_files[lX_key]
         return 'y_t_delta.npz'
 

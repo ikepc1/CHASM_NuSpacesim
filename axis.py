@@ -453,7 +453,7 @@ class MeshAxis(Axis):
     '''This class is the implementation of an axis where the sampled points are
     spread into a mesh.
     '''
-    lXs = np.arange(-4,1)
+    lXs = np.arange(-6,0)
 
     def __init__(self, lX_interval: tuple, linear_axis: Axis, shower: Shower):
         self.lX_interval = lX_interval
@@ -535,24 +535,29 @@ class MeshAxis(Axis):
         '''
         return self.linear_axis.get_attenuation(axis, counters, y)
 
-    # def get_gg_file(self):
-    #     '''This method returns the gg array file for the axis' particular
-    #     log(moliere) interval.
-    #     '''
-    #     start = self.find_nearest_interval()
-    #     if start < -4:
-    #         return 'gg_t_delta_theta_mc.npz'
-    #     else:
-    #         return f'gg_t_delta_theta_lX_{start}_to_{start+1}.npz'
-
-    def find_nearest_interval(self):
-        return self.lXs[np.abs(self.lX_interval[0]-self.lXs).argmin()]
-
-    def get_gg_file(self):
-        '''This method returns the original gg array file.
+    def get_gg_file(self) -> str:
+        '''This method returns the gg array file for the axis' particular
+        log(moliere) interval.
         '''
-        # return 'gg_t_delta_theta_mc.npz'
-        return 'gg_t_delta_theta_2020_normalized.npz'
+        start, end = self.find_nearest_interval()
+        return f'gg_t_delta_theta_lX_{start}_to_{end}.npz'
+
+    def find_nearest_interval(self) -> tuple:
+        '''This method returns the start and end points of the lX interval that
+        the mesh falls within.
+        '''
+        index = np.searchsorted(self.lXs[:-1],self.lX)
+        if index == 0:
+            return self.lXs[0], self.lXs[1]
+        else:
+            return self.lXs[index-1], self.lXs[index]
+
+    # def get_gg_file(self):
+    #     '''This method returns the original gg array file.
+    #     '''
+    #     # return 'gg_t_delta_theta_lX_-6_to_-5.npz'
+    #     # return 'gg_t_delta_theta_mc.npz'
+    #     return 'gg_t_delta_theta_2020_normalized.npz'
 
 class MeshShower(Shower):
     '''This class is the implementation of a shower where the shower particles are
