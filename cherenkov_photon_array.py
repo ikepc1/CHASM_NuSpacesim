@@ -72,7 +72,8 @@ class CherenkovPhotonArray:
         zeromask = gg2 == 0
         gg2[zeromask] = 1.e-8 #occasionally there will be some zeros in this array, we dont want to divide by zero
         # gg2[zeromask] = np.finfo(float).eps
-        gg  = gg2[0]*(gg2[1]/gg2[0])**sd
+        frac = gg2[1]/gg2[0]
+        gg  = gg2[0]*np.sign(frac)*(np.abs(frac))**sd
         # gg[zeromask.sum(axis=1)] = 0 #for the instances where there were zeros, the value of gg should be zero
         return gg
 
