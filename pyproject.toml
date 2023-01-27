@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CHASM"
+version = "0.0.1"
+authors = [
+  { name="Isaac Buckland", email="ikepc1@gmail.com" },
+]
+description = "CHerenkov Air Shower Model"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ikepc1/CHASM_NuSpacesim"
