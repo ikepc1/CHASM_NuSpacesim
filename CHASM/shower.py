@@ -49,7 +49,7 @@ class Shower(ABC):
         '''Returns shower age at X'''
         return 3*X / (X + 2*self.X_max)
 
-    def dE_dX_at_age(self, s: np.ndarray):
+    def dE_dX_at_age(self, s: np.ndarray) -> np.ndarray:
         '''This method computes the avg ionization loss rate at shower age s.
         Parameters:
         s: shower age
@@ -59,7 +59,7 @@ class Shower(ABC):
         t3 = 0.13180 * s
         return t1 + 2.41715 + t3
 
-    def dE_dX(self, X: np.ndarray):
+    def dE_dX(self, X: np.ndarray) -> np.ndarray:
         '''This method computes the avg ionization loss rate at shower depth X.
         Parameters:
         X: Shower depth
