@@ -6,8 +6,6 @@ class Shower(ABC):
     a shower profile
     '''
     # X0 = 0. #Default value for X0
-    def __init__(self, X0=36.62):
-        self.X0 = X0
 
     @property
     def X_max(self):
@@ -43,13 +41,31 @@ class Shower(ABC):
         '''X0 property setter'''
         self._X0 = X0
 
-    def stage(self, X):
+    def stage(self, X, X0=36.62):
         '''returns stage as a function of shower depth'''
-        return (X-self.X_max)/self.X0
+        return (X-self.X_max)/X0
 
     def age(self, X: np.ndarray) -> np.ndarray:
-        '''Returns shower age at X.'''
+        '''Returns shower age at X'''
         return 3*X / (X + 2*self.X_max)
+
+    def dE_dX_at_age(self, s: np.ndarray):
+        '''This method computes the avg ionization loss rate at shower age s.
+        Parameters:
+        s: shower age
+        returns: dE_dX in MeV / (g / cm^2)
+        '''
+        t1 = 3.90883 / ((1.05301 + s)**9.91717)
+        t3 = 0.13180 * s
+        return t1 + 2.41715 + t3
+
+    def dE_dX(self, X: np.ndarray):
+        '''This method computes the avg ionization loss rate at shower depth X.
+        Parameters:
+        X: Shower depth
+        returns: dE_dX in MeV / (g / cm^2)
+        '''
+        return self.dE_dX_at_age(self.age(X))
 
     @abstractmethod
     def profile(self,*args,**kwargs):
