@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "CHASM_NuSpacesim"
-version = "0.0.1"
+version = "0.0.3"
 authors = [
   { name="Isaac Buckland", email="ikepc1@gmail.com" },
 ]
