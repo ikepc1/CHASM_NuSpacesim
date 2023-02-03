@@ -127,6 +127,8 @@ class Axis(ABC):
         The corrected angles(s)
         '''
         cq = (r**2 + h**2 + 2*cls.earth_radius*h)/(2*r*(cls.earth_radius+h))
+        cq[cq>1.] = 1.
+        cq[cq<-1.] = -1.
         # cq = ((cls.earth_radius+h)**2+r**2-cls.earth_radius**2)/(2*r*(cls.earth_radius+h))
         return np.arccos(cq)
 
