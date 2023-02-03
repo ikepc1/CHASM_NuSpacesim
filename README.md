@@ -1,3 +1,3 @@
 # CHASM (CHerenkov Air Shower Model)
 
-CHASM is a python package which leverages the universality of charged particles in an extensive air shower to produce a deterministic prediction of its Cherenkov light signal. 
+CHASM is a python package which leverages the universality of charged particles in an extensive air shower to produce a deterministic prediction of the Cherenkov light signal for a given shower profile and geometry. At samples throughout the domain of all shower development stages and altitudes, the angular and yield distributions of Cherenkov light have been calculated at an array of distances from a shower axis. Chasm accesses and interpolates between these distributions at runtime to produce the aggregate signal from the whole shower at user defined telescope locations.
