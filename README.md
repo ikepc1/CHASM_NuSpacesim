@@ -1,5 +1,4 @@
-![CHASM logo](https://github.com/ikepc1/CHASM_NuSpacesim/tree/master/docs/CHASM_logo.png)
-
+![CHASM_logo](https://user-images.githubusercontent.com/64815713/217383767-9bdf9ff9-88ec-43f5-b670-c92de67aa085.png)
 
 # CHASM (CHerenkov Air Shower Model)
 
