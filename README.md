@@ -27,25 +27,39 @@ sim = ShowerSimulation()
 ```
 
 Then add an axis. The origin of the coordinate system is where the axis meets the ground. It is defined by a polar angle, azimuthal angle, and keyword arguments for the ground level and whether to account for atmospheric curvature.
-
-`sim.add(DownwardAxis(theta, phi, ground_level = 0., curved = False))`
+```
+sim.add(DownwardAxis(theta, phi, ground_level = 0., curved = False))
+```
 or
-`sim.add(DownwardAxis(theta, phi, ground_level = 0., curved = False))`
+```
+sim.add(UpwardAxis(theta, phi, ground_level = 0., curved = False))
+```
 
 Then add a shower.
 
-`sim.add(GHShower(X_max, N_max, X0, Lambda))`
+```
+sim.add(GHShower(X_max, N_max, X0, Lambda))
+```
 or
-`sim.add(UserShower(X, N))`
+```
+sim.add(UserShower(X, N))
+```
 
 Now we add photon counters. Both spherical CORSIKA IACT style counters and flat counting apertures are available.
 
-`sim.add(SphericalCounters(counter_vectors, counter_radius))`
+```
+sim.add(SphericalCounters(counter_vectors, counter_radius))
+```
 or
-`sim.add(FlatCounters(counter_vectors, counter_radius))`
+```
+sim.add(FlatCounters(counter_vectors, counter_radius))
+```
 
 Finally, we define the Cherenkov wavelength interval of interest.
-`sim.add(Yield(min_l, max_l, N_bins = 1))`
+
+```
+sim.add(Yield(min_l, max_l, N_bins = 1))
+```
 
 We can now run the simulation, and generate signals.
 
