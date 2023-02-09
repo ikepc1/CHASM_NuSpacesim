@@ -67,4 +67,7 @@ We can now run the simulation, and generate signals.
 sim.run(mesh = True)
 sim.get_signal_sum()
 sim.get_attenuated_signal_sum()
+
+times = sim.get_signal_times()
+photons = sim.get_signal_times(att=False)
 ```
