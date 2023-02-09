@@ -8,7 +8,9 @@ CHASM is a python package which leverages the universality of charged particles 
 
 To install from pip:
 
-`pip install CHASM-NuSpacesim`￼
+```
+pip install CHASM-NuSpacesim
+```
 
 To install from source:
 
