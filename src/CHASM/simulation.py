@@ -592,6 +592,12 @@ class ShowerSimulation:
             sum += self.get_attenuated_photon_sum(i=i_s)
         return sum
 
+    def mean_dE_dX(self, X: np.ndarray, i_s: int=0) -> np.ndarray:
+        '''This method wraps the simulation shower's avg stopping power method.
+        '''
+        shower = self.ingredients['shower'][i_s]
+        return shower.dE_dX(X)
+
 if __name__ == '__main__':
     import numpy as np
     from shower import *
