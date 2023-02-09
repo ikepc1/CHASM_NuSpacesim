@@ -459,7 +459,7 @@ class MeshAxis(Axis):
     '''This class is the implementation of an axis where the sampled points are
     spread into a mesh.
     '''
-    lXs = np.arange(-6,0)
+    lXs = np.arange(-6,0) #Log moliere radii corresponding to the bin edges of the tabulated gg files.
 
     def __init__(self, lX_interval: tuple, linear_axis: Axis, shower: Shower):
         self.lX_interval = lX_interval

@@ -421,7 +421,10 @@ class ShowerSimulation:
             self.signals[0,0] = Signal(shower,axis,counters,y)
             self.times[0,0] = axis.get_timing(axis, counters)
             self.attenuations[0,0] = axis.get_attenuation(axis, counters,y)
-
+        self.N_lX = self.signals[:,0].size
+        self.N_c = self.ingredients['counters'][0].N_counters
+        self.N_axis_points = np.size(self.signals[0,0].axis.altitude)
+        self.N_bunches = self.N_lX * self.N_axis_points
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -494,31 +497,56 @@ class ShowerSimulation:
             hist += np.histogram(self.get_times(i=i_s)[i_counter],N_bins,(t_min,t_max),weights=self.get_photons(i=i_s)[i_counter])[0]
         return hist
 
-    def get_signal_times(self):
-        '''This method takes the times at which each photon bunch arrives and
-        combines them into one array.
-        '''
-        N_lX = self.signals[:,0].size
-        N_c = self.ingredients['counters'][0].N_counters
-        times_array = np.zeros((N_c, 1))
-        photons_array = np.zeros_like(times_array)
-        for i_s in range(N_lX):
-            times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
-            photons_array = np.append(photons_array, self.get_photons(i=i_s), axis = 1)
-        return times_array, photons_array
+    # def get_signal_times(self):
+    #     '''This method takes the times at which each photon bunch arrives and
+    #     combines them into one array.
+    #     '''
+    #     N_lX = self.signals[:,0].size
+    #     N_c = self.ingredients['counters'][0].N_counters
+    #     times_array = np.zeros((N_c, 1))
+    #     photons_array = np.zeros_like(times_array)
+    #     for i_s in range(N_lX):
+    #         times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
+    #         photons_array = np.append(photons_array, self.get_photons(i=i_s), axis = 1)
+    #     return times_array, photons_array
 
-    def get_attenuated_signal_times(self):
-        '''This method takes the times at which each photon bunch arrives and
-        combines them into one array.
+    def get_signal_photons(self, att = False) -> np.ndarray:
+        '''This method takes the photon counts from each step from each shower
+        axis object and combines them into a single array.
         '''
-        N_lX = self.signals[:,0].size
-        N_c = self.ingredients['counters'][0].N_counters
-        times_array = np.zeros((N_c, 1))
-        photons_array = np.zeros_like(times_array)
-        for i_s in range(N_lX):
-            times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
-            photons_array = np.append(photons_array, self.get_attenuated_photons(i=i_s), axis = 1)
-        return times_array, photons_array
+        photons_array = np.empty((self.N_c,self.N_bunches))
+        i_s = 0
+        for i_a in range(self.N_lX):
+            if att:
+                photons_array[:,i_s:i_s+self.N_axis_points] = self.get_attenuated_photons(i=i_a)
+            else:
+                photons_array[:,i_s:i_s+self.N_axis_points] = self.get_photons(i=i_a)
+            i_s += self.N_axis_points
+        return photons_array
+
+    def get_signal_times(self) -> np.ndarray:
+        '''This method takes the arrival times of photon bunches from each step
+        from each shower axis object and combines them into a single array.
+        '''
+        times_array = np.empty((self.N_c,self.N_bunches))
+        i_s = 0
+        for i_a in range(self.N_lX):
+            times_array[:,i_s:i_s+self.N_axis_points] = self.get_times(i=i_a)
+            i_s += self.N_axis_points
+        return times_array
+
+    # def get_attenuated_signal_times(self):
+    #     '''This method takes the times at which each photon bunch arrives and
+    #     combines them into one array.
+    #     '''
+    #     N_lX = self.signals[:,0].size
+    #     N_c = self.ingredients['counters'][0].N_counters
+    #     times_array = np.zeros((N_c, 1))
+    #     photons_array = np.zeros_like(times_array)
+    #     for i_s in range(N_lX):
+    #         times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
+    #         photons_array = np.append(photons_array, self.get_attenuated_photons(i=i_s), axis = 1)
+    #     return times_array, photons_array
 
     def get_attenuated_photons_array(self, i=0, j=0):
         '''This method returns the attenuated number of photons going from each
