@@ -9,6 +9,106 @@ from .atmosphere import *
 from .generate_Cherenkov import MakeYield
 from .shower import Shower
 
+class Counters(ABC):
+    '''This is the class containing the neccessary methods for finding the
+    vectors from a shower axis to a user defined array of Cherenkov detectors
+    with user defined size'''
+
+    def __init__(self, input_vectors: np.ndarray, input_radius: np.ndarray):
+        self.vectors = input_vectors
+        self.input_radius = input_radius
+
+    @property
+    def vectors(self):
+        '''Vectors to user defined Cherenkov counters getter'''
+        return self._vectors
+
+    @vectors.setter
+    def vectors(self, input_vectors: np.ndarray):
+        '''Vectors to user defined Cherenkov counters setter'''
+        if type(input_vectors) != np.ndarray:
+            input_vectors = np.array(input_vectors)
+        if input_vectors.shape[1] != 3 or len(input_vectors.shape) != 2:
+            raise ValueError("Input is not an array of vectors.")
+        self._vectors = input_vectors
+
+    @property
+    def input_radius(self):
+        '''This is the input counter radius getter.'''
+        return self._input_radius
+
+    @input_radius.setter
+    def input_radius(self, input_value):
+        '''This is the input counter radius setter.'''
+        if type(input_value) != np.ndarray:
+            input_value = np.array(input_value)
+        if np.size(input_value) == np.shape(self.vectors)[0] or np.size(input_value) == 1:
+            self._input_radius = input_value
+        else:
+            raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
+
+    @property
+    def N_counters(self):
+        '''Number of counters.'''
+        return self.vectors.shape[0]
+
+    @property
+    def r(self):
+        '''distance to each counter property definition'''
+        return vector_magnitude(self.vectors)
+
+    @abstractmethod
+    def area(self, *args, **kwargs):
+        '''This is the abstract method for the detection surface area normal to
+        the axis as seen from each point on the axis. Its shape must be
+        broadcastable to the size of the travel_length array, i.e. either a
+        single value or (# of counters, # of axis points)'''
+
+    @abstractmethod
+    def omega(self, *args, **kwargs):
+        '''This abstract method should compute the solid angle of each counter
+        as seen by each point on the axis'''
+
+    def area_normal(self):
+        '''This method returns the full area of the counting aperture.'''
+        return np.pi * self.input_radius**2
+
+    def law_of_cosines(self, a: np.ndarray, b: np.ndarray, c: np.ndarray):
+        '''This method returns the angle C across from side c in triangle abc'''
+        cos_C = (c**2 - a**2 - b**2)/(-2*a*b)
+        cos_C[cos_C > 1.] = 1.
+        cos_C[cos_C < -1.] = -1.
+        return np.arccos(cos_C)
+
+    def travel_vectors(self, axis_vectors):
+        '''This method returns the vectors from each entry in vectors to
+        the user defined array of counters'''
+        return self.vectors.reshape(-1,1,3) - axis_vectors
+
+    def travel_length(self, axis_vectors):
+        '''This method computes the distance from each point on the axis to
+        each counter'''
+        return vector_magnitude(self.travel_vectors(axis_vectors))
+
+    def cos_Q(self, axis_vectors):
+        '''This method returns the cosine of the angle between the z-axis and
+        the vector from the axis to the counter'''
+        travel_n = self.travel_vectors(axis_vectors) / self.travel_length(axis_vectors)[:,:,np.newaxis]
+        return np.abs(travel_n[:,:,-1])
+
+    def travel_n(self, axis_vectors) -> np.ndarray:
+        '''This method returns the unit vectors pointing along each travel
+        vector.
+        '''
+        return self.travel_vectors(axis_vectors) / self.travel_length(axis_vectors)[:,:,np.newaxis]
+
+    def calculate_theta(self, axis_vectors):
+        '''This method calculates the angle between the axis and counters'''
+        travel_length = self.travel_length(axis_vectors)
+        axis_length = np.broadcast_to(vector_magnitude(axis_vectors), travel_length.shape)
+        counter_length = np.broadcast_to(self.r, travel_length.T.shape).T
+        return self.law_of_cosines(axis_length, travel_length, counter_length)
+
 class Axis(ABC):
     '''This is the abstract base class which contains the methods for computing
     the cartesian vectors and corresponding slant depths of an air shower'''
@@ -212,110 +312,6 @@ class Axis(ABC):
         interval.
         '''
 
-def vector_magnitude(vectors: np.ndarray):
-    '''This method computes the length of an array of vectors'''
-    return np.sqrt((vectors**2).sum(axis = -1))
-
-class Counters(ABC):
-    '''This is the class containing the neccessary methods for finding the
-    vectors from a shower axis to a user defined array of Cherenkov detectors
-    with user defined size'''
-
-    def __init__(self, input_vectors: np.ndarray, input_radius: np.ndarray):
-        self.vectors = input_vectors
-        self.input_radius = input_radius
-
-    @property
-    def vectors(self):
-        '''Vectors to user defined Cherenkov counters getter'''
-        return self._vectors
-
-    @vectors.setter
-    def vectors(self, input_vectors: np.ndarray):
-        '''Vectors to user defined Cherenkov counters setter'''
-        if type(input_vectors) != np.ndarray:
-            input_vectors = np.array(input_vectors)
-        if input_vectors.shape[1] != 3 or len(input_vectors.shape) != 2:
-            raise ValueError("Input is not an array of vectors.")
-        self._vectors = input_vectors
-
-    @property
-    def input_radius(self):
-        '''This is the input counter radius getter.'''
-        return self._input_radius
-
-    @input_radius.setter
-    def input_radius(self, input_value):
-        '''This is the input counter radius setter.'''
-        if type(input_value) != np.ndarray:
-            input_value = np.array(input_value)
-        if np.size(input_value) == np.shape(self.vectors)[0] or np.size(input_value) == 1:
-            self._input_radius = input_value
-        else:
-            raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
-
-    @property
-    def N_counters(self):
-        '''Number of counters.'''
-        return self.vectors.shape[0]
-
-    @property
-    def r(self):
-        '''distance to each counter property definition'''
-        return vector_magnitude(self.vectors)
-
-    @abstractmethod
-    def area(self, *args, **kwargs):
-        '''This is the abstract method for the detection surface area normal to
-        the axis as seen from each point on the axis. Its shape must be
-        broadcastable to the size of the travel_length array, i.e. either a
-        single value or (# of counters, # of axis points)'''
-
-    @abstractmethod
-    def omega(self, *args, **kwargs):
-        '''This abstract method should compute the solid angle of each counter
-        as seen by each point on the axis'''
-
-    def area_normal(self):
-        '''This method returns the full area of the counting aperture.'''
-        return np.pi * self.input_radius**2
-
-    def law_of_cosines(self, a: np.ndarray, b: np.ndarray, c: np.ndarray):
-        '''This method returns the angle C across from side c in triangle abc'''
-        cos_C = (c**2 - a**2 - b**2)/(-2*a*b)
-        cos_C[cos_C > 1.] = 1.
-        cos_C[cos_C < -1.] = -1.
-        return np.arccos(cos_C)
-
-    def travel_vectors(self, axis_vectors):
-        '''This method returns the vectors from each entry in vectors to
-        the user defined array of counters'''
-        return self.vectors.reshape(-1,1,3) - axis_vectors
-
-    def travel_length(self, axis_vectors):
-        '''This method computes the distance from each point on the axis to
-        each counter'''
-        return vector_magnitude(self.travel_vectors(axis_vectors))
-
-    def cos_Q(self, axis_vectors):
-        '''This method returns the cosine of the angle between the z-axis and
-        the vector from the axis to the counter'''
-        travel_n = self.travel_vectors(axis_vectors) / self.travel_length(axis_vectors)[:,:,np.newaxis]
-        return np.abs(travel_n[:,:,-1])
-
-    def travel_n(self, axis_vectors) -> np.ndarray:
-        '''This method returns the unit vectors pointing along each travel
-        vector.
-        '''
-        return self.travel_vectors(axis_vectors) / self.travel_length(axis_vectors)[:,:,np.newaxis]
-
-    def calculate_theta(self, axis_vectors):
-        '''This method calculates the angle between the axis and counters'''
-        travel_length = self.travel_length(axis_vectors)
-        axis_length = np.broadcast_to(vector_magnitude(axis_vectors), travel_length.shape)
-        counter_length = np.broadcast_to(self.r, travel_length.T.shape).T
-        return self.law_of_cosines(axis_length, travel_length, counter_length)
-
 class MakeSphericalCounters(Counters):
     '''This is the implementation of the Counters abstract base class for
     CORSIKA IACT style spherical detection volumes.
@@ -368,6 +364,10 @@ class MakeFlatCounters(Counters):
         each point on the axis
         (# of counters, # of axis points)'''
         return self.area(axis_vectors) / (self.travel_length(axis_vectors)**2)
+
+def vector_magnitude(vectors: np.ndarray):
+    '''This method computes the length of an array of vectors'''
+    return np.sqrt((vectors**2).sum(axis = -1))
 
 class LateralSpread:
     '''This class interacts with the table of NKG universal lateral distributions
@@ -726,7 +726,7 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
-    def get_timing(self):
+    def get_timing_class(self):
         '''This method returns the flat atm downward timing class
         '''
         return DownwardTimingCurved
