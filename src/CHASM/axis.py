@@ -167,6 +167,11 @@ class Axis(ABC):
         axis'''
         return np.interp(r, self.r, self.X)
 
+    def get_timing(self, counters: Counters):
+        '''This function returns an instantiated timing object appropriate for
+        the axis implementation.'''
+        return self.get_timing_class()(self, counters)
+
     @property
     @abstractmethod
     def r(self):
@@ -188,7 +193,7 @@ class Axis(ABC):
         vectors toward each counter'''
 
     @abstractmethod
-    def get_timing(self):
+    def get_timing_class(self):
         '''This method should return the specific timing factory needed for
         the specific axis type (up or down)
         '''
@@ -529,11 +534,11 @@ class MeshAxis(Axis):
         vectors toward each counter'''
         return self.linear_axis.theta(axis_vectors, counters)
 
-    def get_timing(self, axis: Axis, counters: Counters):
+    def get_timing_class(self):
         '''This method should return the specific timing factory needed for
         the specific axis type (up or down)
         '''
-        return self.linear_axis.get_timing(axis, counters)
+        return self.linear_axis.get_timing_class()
 
     def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method should return the specific attenuation factory needed for
@@ -617,9 +622,9 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h / np.cos(self.zenith)
 
-    def get_timing(self, axis: Axis, counters: Counters):
-        '''This method returns the instantiated upward flat atm timing object'''
-        return UpwardTiming(axis, counters)
+    def get_timing_class(self):
+        '''This method returns the upward flat atm timing class'''
+        return UpwardTiming
 
     def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for upward
@@ -644,9 +649,9 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
-    def get_timing(self, axis: Axis, counters: Counters):
-        '''This method returns the instantiated upward flat atm timing object'''
-        return UpwardTimingCurved(axis, counters)
+    def get_timing_class(self):
+        '''This method returns the upward flat atm timing class'''
+        return UpwardTimingCurved
 
     def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for upward
@@ -692,10 +697,10 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         '''This is the axis distance property definition'''
         return self.h / np.cos(self.zenith)
 
-    def get_timing(self, axis: Axis, counters: Counters):
-        '''This method returns the instantiated flat atm downward timing object
+    def get_timing_class(self):
+        '''This method returns the flat atm downward timing class
         '''
-        return DownwardTiming(axis, counters)
+        return DownwardTiming
 
     def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for downward
@@ -721,10 +726,10 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
-    def get_timing(self, axis: Axis, counters: Counters):
-        '''This method returns the instantiated flat atm downward timing object
+    def get_timing(self):
+        '''This method returns the flat atm downward timing class
         '''
-        return DownwardTimingCurved(axis, counters)
+        return DownwardTimingCurved
 
     def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
         '''This method returns the flat atmosphere attenuation object for downward
