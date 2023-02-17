@@ -413,14 +413,14 @@ class ShowerSimulation:
                 meshshower = MeshShower(meshaxis)
                 self.signals[i,0] = Signal(meshshower,meshaxis,counters,y)
                 self.times[i,0] = meshaxis.get_timing(counters)
-                self.attenuations[i,0] = meshaxis.get_attenuation(meshaxis, counters,y)
+                self.attenuations[i,0] = meshaxis.get_attenuation(counters,y)
         else:
             self.signals = np.empty((1,1), dtype = 'O')
             self.times = np.empty((1,1), dtype = 'O')
             self.attenuations = np.empty((1,1), dtype = 'O')
             self.signals[0,0] = Signal(shower,axis,counters,y)
             self.times[0,0] = axis.get_timing(counters)
-            self.attenuations[0,0] = axis.get_attenuation(axis, counters,y)
+            self.attenuations[0,0] = axis.get_attenuation(counters,y)
         self.N_lX = self.signals[:,0].size
         self.N_c = self.ingredients['counters'][0].N_counters
         self.N_axis_points = np.size(self.signals[0,0].axis.altitude)

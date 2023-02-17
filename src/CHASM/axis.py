@@ -272,6 +272,11 @@ class Axis(ABC):
         the axis implementation.'''
         return self.get_timing_class()(self, counters)
 
+    def get_attenuation(self, counters: Counters, y: MakeYield):
+        '''This function returns an instantiated attenuation object appropriate for
+        the axis implementation.'''
+        return self.get_attenuation_class()(self, counters, y)
+
     @property
     @abstractmethod
     def r(self):
@@ -299,7 +304,7 @@ class Axis(ABC):
         '''
 
     @abstractmethod
-    def get_attenuation(self):
+    def get_attenuation_class(self):
         '''This method should return the specific attenuation factory needed for
         the specific axis type (up or down)
         '''
@@ -540,11 +545,11 @@ class MeshAxis(Axis):
         '''
         return self.linear_axis.get_timing_class()
 
-    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
+    def get_attenuation_class(self):
         '''This method should return the specific attenuation factory needed for
         the specific axis type (up or down)
         '''
-        return self.linear_axis.get_attenuation(axis, counters, y)
+        return self.linear_axis.get_attenuation_class()
 
     def get_gg_file(self) -> str:
         '''This method returns the gg array file for the axis' particular
@@ -626,10 +631,10 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         '''This method returns the upward flat atm timing class'''
         return UpwardTiming
 
-    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
+    def get_attenuation_class(self):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
-        return UpwardAttenuation(axis, counters, y)
+        return UpwardAttenuation
 
     def get_gg_file(self):
         '''This method returns the original gg array file.
@@ -653,10 +658,10 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This method returns the upward flat atm timing class'''
         return UpwardTimingCurved
 
-    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
+    def get_attenuation_class(self):
         '''This method returns the flat atmosphere attenuation object for upward
         axes'''
-        return UpwardAttenuationCurved(axis, counters, y)
+        return UpwardAttenuationCurved
 
     def get_gg_file(self):
         '''This method returns the original gg array file.
@@ -702,10 +707,10 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         '''
         return DownwardTiming
 
-    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
+    def get_attenuation_class(self):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
-        return DownwardAttenuation(axis, counters, y)
+        return DownwardAttenuation
 
     def get_gg_file(self):
         '''This method returns the original gg array file.
@@ -731,10 +736,10 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''
         return DownwardTimingCurved
 
-    def get_attenuation(self, axis: Axis, counters: Counters, y: MakeYield):
+    def get_attenuation_class(self):
         '''This method returns the flat atmosphere attenuation object for downward
         axes'''
-        return DownwardAttenuationCurved(axis, counters, y)
+        return DownwardAttenuationCurved
 
     def get_gg_file(self):
         '''This method returns the original gg array file.
@@ -1124,6 +1129,7 @@ class Attenuation(ABC):
         log_fraction_passed_array = self.log_fraction_passed()
         fraction_passed_array = np.empty_like(log_fraction_passed_array, dtype= 'O')
         for i, lfp in enumerate(log_fraction_passed_array):
+            lfp[lfp>0.] = -100.
             fraction_passed_array[i] = np.exp(lfp)
         return fraction_passed_array
 
