@@ -147,7 +147,7 @@ class Axis(ABC):
         if azimuth >= 2 * np.pi:
             raise ValueError('Azimuthal angle must be less than 2 * pi')
         if azimuth < 0.:
-            raise Valueunattenuated_30degree_sealevelError('Azimuthal angle cannot be less than 0')
+            raise ValueError('Azimuthal angle cannot be less than 0')
         self._azimuth = azimuth
 
     @property
