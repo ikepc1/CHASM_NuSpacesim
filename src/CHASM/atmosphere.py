@@ -410,6 +410,9 @@ class USStandardAtmosphere(Atmosphere):
 
 class CorsikaAtmosphere(Atmosphere):
     '''This is the implementation of a CORSIKA tabulated atmosphere.
+    Parameters: 
+    atm_filename: str representing the name of the corsika atm .dat
+    file in the data directory.
     '''
 
     def __init__(self, atm_filename: str = 'atmprof11.dat') -> None:

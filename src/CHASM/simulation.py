@@ -600,7 +600,7 @@ class ShowerSimulation:
 
 if __name__ == '__main__':
     import numpy as np
-    from shower import *
+    from .shower import *
     plt.ion()
 
     # theta = np.linspace(.01, np.radians(80),100)

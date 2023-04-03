@@ -3,11 +3,12 @@ from abc import ABC, abstractmethod
 from importlib.resources import as_file, files
 from scipy.constants import value,nano
 from scipy.spatial.transform import Rotation as R
-from scipy.stats import norm
+# from scipy.stats import norm
 
-from .atmosphere import *
+from .atmosphere import Atmosphere
 from .generate_Cherenkov import MakeYield
 from .shower import Shower
+from .config import AxisConfig
 
 class Counters(ABC):
     '''This is the class containing the neccessary methods for finding the
@@ -115,12 +116,14 @@ class Axis(ABC):
 
     earth_radius = 6.371e6 #meters
     lX = -100. #This is the default value for the distance to the axis in log moliere units (in this case log(-inf) = 0, or on the axis)
-    atm = USStandardAtmosphere()
+    
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0.):
+    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0., config: AxisConfig = AxisConfig()):
+        self.config = config
+        self.atm = config.ATM
+        self.ground_level = ground_level
         self.zenith = zenith
         self.azimuth = azimuth
-        self.ground_level = ground_level
 
     @property
     def zenith(self):
@@ -165,7 +168,7 @@ class Axis(ABC):
     @property
     def altitude(self):
         '''altitude property definition'''
-        return np.linspace(self.ground_level, self.atm.maximum_height, 1000)
+        return np.linspace(self.ground_level, self.atm.maximum_height, self.config.N_POINTS)
 
     @property
     def dh(self):
@@ -475,10 +478,11 @@ class MeshAxis(Axis):
         self.lX_interval = lX_interval
         self.lX = np.mean(lX_interval)
         self.linear_axis = linear_axis
-        self.shower = shower
+        self.atm = linear_axis.atm
         self.zenith = linear_axis.zenith
         self.azimuth = linear_axis.azimuth
         self.ground_level = linear_axis.ground_level
+        self.shower = shower
         mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.lX, self.linear_axis, self.shower)
         self.rotated_mesh = rotate_mesh(mesh, linear_axis.zenith, linear_axis.azimuth)
 
@@ -1014,7 +1018,7 @@ class Attenuation(ABC):
     calculate the fraction of light removed from the signal at each atmospheric
     step.
     '''
-    atm = USStandardAtmosphere()
+    # atm = USStandardAtmosphere()
 
     with as_file(files('CHASM.data')/'abstable.npz') as file:
         abstable = np.load(file)
@@ -1027,6 +1031,7 @@ class Attenuation(ABC):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
+        self.atm = axis.atm
 
     # def vertical_log_fraction(self) -> np.ndarray:
     #     '''This method returns the natural log of the fraction of light which
