@@ -2,36 +2,64 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.constants import Avogadro
 from abc import ABC, abstractmethod
+from importlib.resources import as_file, files
+
 
 class Atmosphere(ABC):
     '''This is the abstract base class for creating atmosphere objects. It
     contains the necessary methods related to the atmosphere for use in the
     rest of CHASM.
     '''
+    temperature_sea_level = 288.15    # K
+    pressure_sea_level    = 101325    # Pa
+    density_sea_level     = 1.225     # kg/m3
+    air_mol_weight        = 28.9644   # amu
+    gravity               = 9.80665   # m/s2
+    gas_constant          = 8.31432   # J/MolK
+    gMR           = gravity * air_mol_weight / gas_constant
+    avo = Avogadro
 
-    @abstractmethod
-    def temperature(self,h):
-        """
-        This function returns temperature as a function of height.
+    # @abstractmethod
+    # def temperature(self,h):
+    #     """
+    #     This function returns temperature as a function of height.
+
+    #     Parameters:
+    #         h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+    #     Returns:
+    #         T - temperature [K]
+    #     """
+
+    # @abstractmethod
+    # def pressure(self,h):
+    #     """
+    #     This function returns pressure as a function of height.
+
+    #     Parameters:
+    #         h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+    #     Returns:
+    #         P - pressure [Pa]
+    #     """
+
+    def number_density(self,h):
+        '''
+        This method returns the approximate number density of air molecules as
+        a function of height.
 
         Parameters:
             h - height in atmosphere. This can be an ndarray or a single value. [m]
 
         Returns:
-            T - temperature [K]
-        """
+            N - number density [N/m3]
+        '''
+        return self.density(h) * 1.e3 *  self.avo / self.air_mol_weight
 
+    @property
     @abstractmethod
-    def pressure(self,h):
-        """
-        This function returns pressure as a function of height.
-
-        Parameters:
-            h - height in atmosphere. This can be an ndarray or a single value. [m]
-
-        Returns:
-            P - pressure [Pa]
-        """
+    def maximum_height(self) -> float:
+        '''This property should return the maximum tabulated height.'''
 
     @abstractmethod
     def density(self,h):
@@ -45,18 +73,18 @@ class Atmosphere(ABC):
             rho - density [kg/m3]
         """
 
-    @abstractmethod
-    def number_density(self,h):
-        '''
-        This method returns the approximate number density of air molecules as
-        a function of height.
+    # @abstractmethod
+    # def number_density(self,h):
+    #     '''
+    #     This method returns the approximate number density of air molecules as
+    #     a function of height.
 
-        Parameters:
-            h - height in atmosphere. This can be an ndarray or a single value. [m]
+    #     Parameters:
+    #         h - height in atmosphere. This can be an ndarray or a single value. [m]
 
-        Returns:
-            N - number density [N/m3]
-        '''
+    #     Returns:
+    #         N - number density [N/m3]
+    #     '''
 
     @abstractmethod
     def delta(self,h):
@@ -123,8 +151,12 @@ class USStandardAtmosphere(Atmosphere):
             self.rel_pressure  = rel_pressure
             self.temperatures  = temperatures
             self.temp_gradient = temp_gradient
-        self.maximum_height = self.altitudes[-1]
+        # self.maximum_height = self.altitudes[-1]
         self.minimum_height = self.altitudes[0]
+
+    @property
+    def maximum_height(self):
+        return self.altitudes.max()
 
     def atmosphere(self,h):
         """
@@ -223,18 +255,18 @@ class USStandardAtmosphere(Atmosphere):
         _,_,rho = self.atmosphere(h)
         return(rho)
 
-    def number_density(self,h):
-        '''
-        This method returns the approximate number density of air molecules as
-        a function of height.
+    # def number_density(self,h):
+    #     '''
+    #     This method returns the approximate number density of air molecules as
+    #     a function of height.
 
-        Parameters:
-            h - height in atmosphere. This can be an ndarray or a single value. [m]
+    #     Parameters:
+    #         h - height in atmosphere. This can be an ndarray or a single value. [m]
 
-        Returns:
-            N - number density [N/m3]
-        '''
-        return self.density(h) * 1.e3 *  self.avo / self.air_mol_weight
+    #     Returns:
+    #         N - number density [N/m3]
+    #     '''
+    #     return self.density(h) * 1.e3 *  self.avo / self.air_mol_weight
 
     def delta(self,h):
         """
@@ -375,6 +407,46 @@ class USStandardAtmosphere(Atmosphere):
             return self.depth(h1,h2)/costheta[0]
         else:
             return self.depth(h1,h2)/costheta
+
+class CorsikaAtmosphere(Atmosphere):
+    '''This is the implementation of a CORSIKA tabulated atmosphere.
+    '''
+
+    def __init__(self, atm_filename: str = 'atmprof11.dat') -> None:
+        with as_file(files('CHASM.data')/f'{atm_filename}') as file:
+            self.atm_data = np.loadtxt(file)
+        self._heights = self.atm_data[:,0] * 1.e3 # convert to m
+        self._rhos = self.atm_data[:,1] * 1.e3 # convert to kg/m^3
+        self._thicks = self.atm_data[:,2]
+        self._deltas = self.atm_data[:,3]
+
+    @property
+    def maximum_height(self) -> float:
+        return self._heights.max()
+
+    def density(self,h):
+        """
+        This function returns density as a function of height.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            rho - density [kg/m3]
+        """
+        return np.interp(h, self._heights, self._rhos)
+
+    def delta(self,h):
+        """
+        This function returns the difference of the index-of-refraction from unity.
+
+        Parameters:
+            h - height in atmosphere. This can be an ndarray or a single value. [m]
+
+        Returns:
+            delta - equal to n - 1.
+        """
+        return np.interp(h, self._heights, self._deltas)
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

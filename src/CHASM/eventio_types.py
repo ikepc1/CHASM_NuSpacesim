@@ -72,8 +72,18 @@ class Varint(EventioType):
         return self.value.to_bytes(1, 'little')
 
 @dataclass
+class Varstring(EventioType):
+    '''This is the implementation of a varstring with a one byte integer 
+    length prepended.
+    '''
+    value: str
+
+    def to_bytes(self) -> bytes:
+        return Varint(len(self.value)).to_bytes() + bytes(self.value, 'utf8')
+
+@dataclass
 class Double(EventioType):
-    ''''This is the implementation of the single byte ints found in the 
+    ''''This is the implementation of a double precision float in the 
     eventio bytestream.
     '''
     value: np.float64

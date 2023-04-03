@@ -152,13 +152,19 @@ class InputCardData:
     '''
     lines: list[String] = field(default_factory= lambda: [String('Input Card Placeholder')])
 
+
+
 @dataclass
 class AtmosphericProfileData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     atmospheric profile block.
     '''
-    # name: float = struct.unpack('f',b'atmprof11.dat')[0]
-    # obslevel:
+    name: Varstring = Varstring('atmprof11.dat')
+    obslev: Double = Double(0.)
+    table_size: Varint = Varint(50)
+    # altitude_km: list[Double] = field
+
+
 
 @dataclass
 class TelescopeDefinitionData:
