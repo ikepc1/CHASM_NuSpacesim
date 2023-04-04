@@ -2,8 +2,8 @@ from importlib.resources import as_file, files
 import numpy as np
 from scipy.constants import value,nano
 
-from .cherenkov_photon import CherenkovPhoton
-from .cherenkov_photon_array import CherenkovPhotonArray
+# from .cherenkov_photon import CherenkovPhoton
+# from .cherenkov_photon_array import CherenkovPhotonArray
 
 class MakeYield:
     '''This class interacts with the table of Cherenkov yield ratios'''

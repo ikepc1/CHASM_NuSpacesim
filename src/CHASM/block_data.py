@@ -3,6 +3,7 @@ from datetime import datetime
 import struct
 
 from .eventio_types import *
+from .config import AxisConfig
 
 def value_list(block_data: dataclass) -> list[EventioType]:
     '''This property is the attributes in a block dataclass as a list in 
@@ -152,17 +153,20 @@ class InputCardData:
     '''
     lines: list[String] = field(default_factory= lambda: [String('Input Card Placeholder')])
 
-
+def atm_altitudes_km() -> list[Double]:
+    '''This gets the altitudes from the axis atmosphere config file'''
+    return [Double(val / 1.e3) for val in AxisConfig().ATM.altitudes.tolist()]
 
 @dataclass
 class AtmosphericProfileData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     atmospheric profile block.
     '''
-    name: Varstring = Varstring('atmprof11.dat')
+    name: Varstring = Varstring(AxisConfig().ATM.name)
     obslev: Double = Double(0.)
-    table_size: Varint = Varint(50)
-    # altitude_km: list[Double] = field
+    table_size: Varint = Varint(len(AxisConfig().ATM.altitudes.tolist()))
+    altitude_km: list[Double] = field(default_factory=atm_altitudes_km)
+    
 
 
 
