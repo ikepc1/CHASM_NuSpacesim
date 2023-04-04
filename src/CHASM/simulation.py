@@ -342,6 +342,7 @@ class Signal:
         each counter from every axis bin
 
         The returned array is of size:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
         gg = self.calculate_gg()
@@ -384,6 +385,10 @@ class ShowerSimulation:
                 return False
         return True
 
+    @property
+    def n_tel(self):
+        return self.ingredients['counters'][0].n_tel
+    
     # def run(self, mesh: bool = False):
     #     '''This is the proprietary run method which creates the arrays of
     #     Signal, Timing, and Attenuation objects

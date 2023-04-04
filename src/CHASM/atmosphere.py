@@ -65,7 +65,7 @@ class Atmosphere(ABC):
     @property
     @abstractmethod
     def altitudes(self) -> np.ndarray:
-        '''This property should return a list of the altitudes.'''
+        '''This property should return an array of the altitudes.'''
 
     @property
     @abstractmethod
@@ -83,6 +83,12 @@ class Atmosphere(ABC):
         Returns:
             rho - density [kg/m3]
         """
+
+    @abstractmethod
+    def thickness(self) -> np.ndarray:
+        '''This method should return an array of the thicknesses between
+        altitudes.
+        '''
 
     # @abstractmethod
     # def number_density(self,h):
@@ -364,6 +370,15 @@ class USStandardAtmosphere(Atmosphere):
         else:
             return depth
 
+    def thickness(self) -> np.ndarray:
+        '''This method returns an array of the thicknesses between
+        altitudes.
+        '''
+        thicks = np.empty(self.altitudes.size, dtype=np.float64)
+        thicks[:-1] = self.depth(self.altitudes[:-1],self.altitudes[1:])
+        thicks[-1] = 0.
+        return thicks
+
     def slant_depth(self,theta,d1,d2=None):
         """
         This function returns atmospheric depth as a function of the slant angle with respect to the vertical.
@@ -492,6 +507,12 @@ class CorsikaAtmosphere(Atmosphere):
             rho - density [kg/m3]
         """
         return np.interp(h, self.altitudes, self._rhos)
+
+    def thickness(self) -> np.ndarray:
+        '''This method returns an array of the thicknesses between
+        altitudes.
+        '''
+        return self._thicks
 
     def delta(self,h):
         """
