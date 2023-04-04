@@ -5,6 +5,7 @@ import eventio
 from .shower import *
 from .axis import *
 from .generate_Cherenkov import *
+from .cherenkov_photon_array import CherenkovPhotonArray
 
 #Wrap eventio for extraction of CORSIKA shower data.
 class EventioWrapper(eventio.IACTFile):
@@ -297,6 +298,21 @@ class Signal:
     def __repr__(self):
         return f"Signal({self.shower.__repr__()}, {self.axis.__repr__()}, {self.counters.__repr__()})"
 
+    # def calculate_gg(self):
+    #     '''This funtion returns the interpolated values of gg at a given deltas
+    #     and thetas
+
+    #     returns:
+    #     the angular distribution values at the desired thetas
+    #     The returned array is of size:
+    #     (# of counters, # of axis points)
+    #     '''
+    #     gg = np.empty_like(self.theta)
+    #     for i in range(gg.shape[1]):
+    #         gg_td = self.gga.angular_distribution(self.t[i], self.axis.delta[i])
+    #         gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
+    #     return gg
+    
     def calculate_gg(self):
         '''This funtion returns the interpolated values of gg at a given deltas
         and thetas
@@ -307,9 +323,8 @@ class Signal:
         (# of counters, # of axis points)
         '''
         gg = np.empty_like(self.theta)
-        for i in range(gg.shape[1]):
-            gg_td = self.gga.angular_distribution(self.t[i], self.axis.delta[i])
-            gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
+        for i in range(gg.shape[0]):
+            gg[i] = self.gga.gg_of_t_delta_theta(self.t,self.axis.delta,self.theta[i])
         return gg
 
     def calculate_yield(self, y: MakeYield):
@@ -327,6 +342,7 @@ class Signal:
         each counter from every axis bin
 
         The returned array is of size:
+        # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
         gg = self.calculate_gg()
@@ -369,6 +385,10 @@ class ShowerSimulation:
                 return False
         return True
 
+    @property
+    def n_tel(self):
+        return self.ingredients['counters'][0].n_tel
+    
     # def run(self, mesh: bool = False):
     #     '''This is the proprietary run method which creates the arrays of
     #     Signal, Timing, and Attenuation objects

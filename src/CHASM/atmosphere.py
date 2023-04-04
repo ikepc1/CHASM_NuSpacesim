@@ -58,6 +58,17 @@ class Atmosphere(ABC):
 
     @property
     @abstractmethod
+    def name(self) -> str:
+        '''This property should the name of the atm implementation'''
+
+
+    @property
+    @abstractmethod
+    def altitudes(self) -> np.ndarray:
+        '''This property should return an array of the altitudes.'''
+
+    @property
+    @abstractmethod
     def maximum_height(self) -> float:
         '''This property should return the maximum tabulated height.'''
 
@@ -72,6 +83,12 @@ class Atmosphere(ABC):
         Returns:
             rho - density [kg/m3]
         """
+
+    @abstractmethod
+    def thickness(self) -> np.ndarray:
+        '''This method should return an array of the thicknesses between
+        altitudes.
+        '''
 
     # @abstractmethod
     # def number_density(self,h):
@@ -110,6 +127,7 @@ class USStandardAtmosphere(Atmosphere):
     """
 
     # Class constants for 1976 US Standard Atmosphere
+    name = 'USSTANDARDATM1976'
     temperature_sea_level = 288.15    # K
     pressure_sea_level    = 101325    # Pa
     density_sea_level     = 1.225     # kg/m3
@@ -151,12 +169,32 @@ class USStandardAtmosphere(Atmosphere):
             self.rel_pressure  = rel_pressure
             self.temperatures  = temperatures
             self.temp_gradient = temp_gradient
-        # self.maximum_height = self.altitudes[-1]
+        self.maximum_height = self.altitudes[-1]
         self.minimum_height = self.altitudes[0]
 
     @property
+    def name(self):
+        return self._name
+    
+    @name.setter
+    def name(self, value: str):
+        self._name = value
+
+    @property
     def maximum_height(self):
-        return self.altitudes.max()
+        return self._maximum_height
+    
+    @maximum_height.setter
+    def maximum_height(self, value: float):
+        self._maximum_height = value
+
+    @property
+    def altitudes(self):
+        return self._altitudes
+    
+    @altitudes.setter
+    def altitudes(self, value: np.ndarray):
+        self._altitudes = value
 
     def atmosphere(self,h):
         """
@@ -332,6 +370,15 @@ class USStandardAtmosphere(Atmosphere):
         else:
             return depth
 
+    def thickness(self) -> np.ndarray:
+        '''This method returns an array of the thicknesses between
+        altitudes.
+        '''
+        thicks = np.empty(self.altitudes.size, dtype=np.float64)
+        thicks[:-1] = self.depth(self.altitudes[:-1],self.altitudes[1:])
+        thicks[-1] = 0.
+        return thicks
+
     def slant_depth(self,theta,d1,d2=None):
         """
         This function returns atmospheric depth as a function of the slant angle with respect to the vertical.
@@ -418,14 +465,36 @@ class CorsikaAtmosphere(Atmosphere):
     def __init__(self, atm_filename: str = 'atmprof11.dat') -> None:
         with as_file(files('CHASM.data')/f'{atm_filename}') as file:
             self.atm_data = np.loadtxt(file)
-        self._heights = self.atm_data[:,0] * 1.e3 # convert to m
+        self.name = atm_filename
+        self.altitudes = self.atm_data[:,0] * 1.e3 # convert to m
         self._rhos = self.atm_data[:,1] * 1.e3 # convert to kg/m^3
         self._thicks = self.atm_data[:,2]
         self._deltas = self.atm_data[:,3]
+        self.maximum_height = self.altitudes.max()
 
     @property
-    def maximum_height(self) -> float:
-        return self._heights.max()
+    def name(self):
+        return self._name
+    
+    @name.setter
+    def name(self, value: str):
+        self._name = value
+
+    @property
+    def maximum_height(self):
+        return self._maximum_height
+    
+    @maximum_height.setter
+    def maximum_height(self, value):
+        self._maximum_height = value
+
+    @property
+    def altitudes(self):
+        return self._altitudes
+    
+    @altitudes.setter
+    def altitudes(self, value: np.ndarray):
+        self._altitudes = value
 
     def density(self,h):
         """
@@ -437,7 +506,13 @@ class CorsikaAtmosphere(Atmosphere):
         Returns:
             rho - density [kg/m3]
         """
-        return np.interp(h, self._heights, self._rhos)
+        return np.interp(h, self.altitudes, self._rhos)
+
+    def thickness(self) -> np.ndarray:
+        '''This method returns an array of the thicknesses between
+        altitudes.
+        '''
+        return self._thicks
 
     def delta(self,h):
         """
@@ -449,7 +524,7 @@ class CorsikaAtmosphere(Atmosphere):
         Returns:
             delta - equal to n - 1.
         """
-        return np.interp(h, self._heights, self._deltas)
+        return np.interp(h, self.altitudes, self._deltas)
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

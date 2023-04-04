@@ -4,7 +4,7 @@ import numpy as np
 # import struct
 
 from .eventio_types import *
-from .simulation import *
+from .simulation import ShowerSimulation, Signal
 from .block_data import *
 
 SYNC_MARKER = b'\x37\x8a\x1f\xd4'
@@ -25,22 +25,49 @@ IACT_TYPES = {
     'RunEnd':1210,   
 }
 
+IACT_NEEDS_SIM = {
+    'RunHeader':False,
+    'InputCard':False,
+    'AtmosphericProfile':False,
+    'TelescopeDefinition':True,
+    'EventHeader':True,
+    'ArrayOffsets':True,
+    'Longitudinal':True,
+    'TelescopeData':True,
+    # 'Photons':True,
+    # 'CameraLayout':True,
+    # 'TriggerTime':1207,
+    # 'PhotoElectrons':1208,
+    'EventEnd':False,
+    'RunEnd':False,   
+}
+
 IACT_OBJECTS = {
     'RunHeader': RunHeaderData,
-    # 'InputCard': InputCardData,
-    # 'AtmosphericProfile': AtmosphericProfileData,
-    # 'TelescopeDefinition': TelescopeDefinitionData,
-    # 'EventHeader': EventHeaderData,
-    # 'ArrayOffsets': ArrayOffsetsData,
-    # 'Longitudinal': LongitudinalData,
-    # 'TelescopeData': TelescopeData,
+    'InputCard': InputCardData,
+    'AtmosphericProfile': AtmosphericProfileData,
+    'TelescopeDefinition': TelescopeDefinitionData,
+    'EventHeader': EventHeaderData,
+    'ArrayOffsets': ArrayOffsetsData,
+    'Longitudinal': LongitudinalData,
+    'TelescopeData': TelescopeData,
     # 'Photons': PhotonsData,
     # 'CameraLayout': CameraLayoutData,
     # 'TriggerTime': TriggerTimeData,
     # 'PhotoElectrons': PhotoElectrons,
-    # 'EventEnd': EventEnd,
-    # 'RunEnd': RunEnd,   
+    'EventEnd': EventEnd,
+    'RunEnd': RunEnd,   
 }
+
+def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
+    '''This function instantiates the data block containers.
+    '''
+    block_dict = {
+    'RunHeader': RunHeaderData,
+    'InputCard': InputCardData,
+    'AtmosphericProfile': AtmosphericProfileData,}
+    block_dict['TelescopeDefinition'] = TelescopeDefinitionData(sim.n_tel,
+                                                                Float(0),)
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
     '''This function writes the header bytes for an eventio file. These 16 

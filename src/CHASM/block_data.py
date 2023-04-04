@@ -3,6 +3,7 @@ from datetime import datetime
 import struct
 
 from .eventio_types import *
+from .config import AxisConfig
 
 def value_list(block_data: dataclass) -> list[EventioType]:
     '''This property is the attributes in a block dataclass as a list in 
@@ -28,7 +29,7 @@ def block_to_bytes(block_data: dataclass) -> bytearray:
     them to a bytearray.
     '''
     values =  value_list(block_data)
-    byte_buffer = bytearray(Int(len(values)).to_bytes())
+    byte_buffer = bytearray()
     for value in values:
         append_EIType_to_buffer(byte_buffer, value)
     return byte_buffer
@@ -152,25 +153,47 @@ class InputCardData:
     '''
     lines: list[String] = field(default_factory= lambda: [String('Input Card Placeholder')])
 
+def atm_altitudes_km() -> list[Double]:
+    '''This gets the altitudes from the axis atmosphere config file'''
+    return [Double(val / 1.e3) for val in AxisConfig().ATM.altitudes.tolist()]
 
+def atm_table() -> list[Double]:
+    '''This takes the atmosphere object from config and converts the 
+    values into a list in the appropriate order for the eventio 
+    block.
+    '''
+    atm = AxisConfig().ATM
+    atm_array = np.empty((atm.altitudes.size,4))
+    atm_array[:,0] = atm.altitudes / 1.e3 #to km
+    atm_array[:,1] = atm.density(atm.altitudes) / 1.e3 #to g/cm^3
+    atm_array[:,2] = atm.thickness()
+    atm_array[:,3] = atm.delta(atm.altitudes)
+    return [Double(val) for val in atm_array.flatten().tolist()]
+
+def five_layer() -> list[Double]:
+    pass
 
 @dataclass
 class AtmosphericProfileData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     atmospheric profile block.
     '''
-    name: Varstring = Varstring('atmprof11.dat')
+    name: Varstring = Varstring(AxisConfig().ATM.name)
     obslev: Double = Double(0.)
-    table_size: Varint = Varint(50)
-    # altitude_km: list[Double] = field
-
-
+    table_size: Varint = Varint(len(AxisConfig().ATM.altitudes.tolist()))
+    altitude_table: list[Double] = field(default_factory=atm_table)
+    n_five_layer: Varint = Varint(0)
+    # htoa: Double = Double(AxisConfig().ATM.altitudes.max())
+    # five_layer_atm: list[Double] = field(default_factory=five_layer)
 
 @dataclass
 class TelescopeDefinitionData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     IACT definition block.
     '''
+    n_tel: Varint
+    empty_word: Float
+
 
 @dataclass
 class EventHeaderData:

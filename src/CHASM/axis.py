@@ -20,6 +20,11 @@ class Counters(ABC):
         self.input_radius = input_radius
 
     @property
+    def n_tel(self):
+        '''Number of telescopes.'''
+        return self.vectors.shape[0]
+
+    @property
     def vectors(self):
         '''Vectors to user defined Cherenkov counters getter'''
         return self._vectors
