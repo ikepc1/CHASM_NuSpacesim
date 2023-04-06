@@ -1,5 +1,5 @@
 from CHASM.simulation import *
-from CHASM.axis import *
+# from CHASM.axis import *
 
 import numpy as np
 from scipy.stats import norm
@@ -44,14 +44,16 @@ def sample_downward_axis_params():
     'ground_level':0.
     }
 
+
 @pytest.fixture
-def sample_downward_fp_axis(sample_downward_axis_params):
+def sample_downward_fp_axis():
     '''Return instantiated downward axis with fp atm axis.'''
-    return MakeDownwardAxisFlatPlanarAtm(*sample_downward_axis_params.values())
+    return DownwardAxis(np.radians(30.),np.radians(45.),0).create()
 
 @pytest.fixture
 def sample_downward_curved_axis(sample_downward_axis_params):
     '''Return instantiated downward axis with curved atm axis.'''
+    
     return MakeDownwardAxisCurvedAtm(*sample_downward_axis_params.values())
 
 @pytest.fixture

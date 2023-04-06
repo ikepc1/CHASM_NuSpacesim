@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Protocol
+from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
 import eventio
 
@@ -102,163 +104,106 @@ class EventioWrapper(eventio.IACTFile):
             p_e = np.append(p_e,p)
         return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
 
-class Element(ABC):
-    '''This is an abstract base class containing the methods needed for
-    implementing a specific class in the broader simulation'''
-
-    def convert_to_iterable(self, input_value):
-        '''If one of the element arguments is a single value, it needs to be '''
-        if np.size(input_value) == 1:
-            return [input_value]
-        else:
-            return np.array(input_value)
-
-    @abstractmethod
-    def __init__(self):
-        '''The element implementation should recieve the user arguments that the
-        element itself needs and its __init__ should save them as attributes'''
-
+class Element(Protocol):
+    '''This is the protocol for a simulation element. It needs a type, either
+    axis, shower, counters, or yield'''
     @property
-    @abstractmethod
     def element_type(self):
-        '''This is the element type property. It needs to be a string, either
-        axis, shower, or counters.
+        ...
+
+    def create(self) -> object:
+        ...
+
+@dataclass
+class AxisParamContainer:
+    '''This is the base class for axis params since both upward
+    and downward axes have the same parameters.
+    '''
+    zenith: float
+    azimuth: float
+    ground_level: float = 0.
+    curved: bool = False
+    mesh: bool = False
+    element_type: str = field(init=False, default='axis', repr=False)
+
+@dataclass
+class DownwardAxis(AxisParamContainer):
+    '''This is the container for a user-defined downward axis' parameters.
+    '''
+    def create(self) -> MakeDownwardAxis:
+        '''This method returns the instantiated axis object.
         '''
-
-    @abstractmethod
-    def create(self):
-        '''This method instantiates the specific element in question'''
-
-class AxisElement(Element):
-    '''This middleman class contains the setters for the theta and phi
-    properties, which are the same for both axis types'''
-
-    @property
-    def zenith(self):
-        '''This is the phi property'''
-        return self._zenith
-
-    @zenith.setter
-    def zenith(self, input_value):
-        '''If the value is a single value, convert it into a list with just
-        that value, otherwise just pass a numpy array
+        if self.curved:
+            return MakeDownwardAxisCurvedAtm(self)
+        else:
+            return MakeDownwardAxisFlatPlanarAtm(self)
+    
+@dataclass
+class UpwardAxis(AxisParamContainer):
+    '''This is the container for a user-defined upward axis' parameters.
+    '''
+    def create(self) -> MakeUpwardAxis:
+        '''This method returns the instantiated axis object.
         '''
-        self._zenith = self.convert_to_iterable(input_value)
+        if self.curved:
+            return MakeUpwardAxisCurvedAtm(self)
+        else:
+            return MakeUpwardAxisFlatPlanarAtm(self)
 
-    @property
-    def azimuth(self):
-        '''This is the phi property'''
-        return self._azimuth
+@dataclass
+class GHShower:
+    '''This is the GH shower ingredient parameter container/factory'''
+    X_max: float
+    N_max: float
+    X0: float
+    Lambda: float
+    element_type: str = field(init=False, default='shower', repr=False)
 
-    @azimuth.setter
-    def azimuth(self, input_value):
-        '''If the value is a single value, convert it into a list with just
-        that value, otherwise just pass a numpy array
-        '''
-        self._azimuth = self.convert_to_iterable(input_value)
-
-class DownwardAxis(AxisElement):
-    '''This is the implementation of the downward axis element'''
-    element_type = 'axis'
-
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0, curved: bool = False):
-        self.zenith = zenith
-        self.azimuth = azimuth
-        self.ground_level = ground_level
-        self.curved = curved
-
-    def create(self) -> np.ndarray:
-        '''this method returns a dictionary element instantiated DownwardAxis
-        class'''
-        object_list = np.empty((np.size(self.zenith), np.size(self.azimuth)), dtype = 'O')
-        for i, t in enumerate(self.zenith):
-            for j, p in enumerate(self.azimuth):
-                if self.curved:
-                    object_list[i, j] = MakeDownwardAxisCurvedAtm(t, p, self.ground_level)
-                else:
-                    object_list[i, j] = MakeDownwardAxisFlatPlanarAtm(t, p, self.ground_level)
-        return object_list
-
-class UpwardAxis(AxisElement):
-    '''This is the implementation of the downward axis element'''
-    element_type = 'axis'
-
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0, curved: bool = False):
-        self.zenith = zenith
-        self.azimuth = azimuth
-        self.ground_level = ground_level
-        self.curved = curved
-
-    def create(self) -> np.ndarray:
-        '''this method returns a dictionary element instantiated DownwardAxis
-        class'''
-        object_list = np.empty((np.size(self.zenith), np.size(self.azimuth)), dtype = 'O')
-        for i, t in enumerate(self.zenith):
-            for j, p in enumerate(self.azimuth):
-                if self.curved:
-                    object_list[i, j] = MakeUpwardAxisCurvedAtm(t, p, self.ground_level)
-                else:
-                    object_list[i, j] = MakeUpwardAxisFlatPlanarAtm(t, p, self.ground_level)
-        return object_list
-
-class GHShower(Element):
-    '''This is the implementation of the GH shower element'''
-    element_type = 'shower'
-
-    def __init__(self, X_max: float, N_max: float, X0: float, Lambda: float):
-        self.X_max = X_max
-        self.N_max = N_max
-        self.X0 = X0
-        self.Lambda = Lambda
-
-    def create(self):
+    def create(self) -> MakeGHShower:
         '''This method returns an instantiated Gaisser Hillas Shower '''
-        return self.convert_to_iterable(MakeGHShower(self.X_max, self.N_max, self.X0, self.Lambda))
+        return MakeGHShower(self.X_max, self.N_max, self.X0, self.Lambda)
 
-class UserShower(Element):
+@dataclass
+class UserShower:
     '''This is the implementation of the GH shower element'''
-    element_type = 'shower'
+    X: np.ndarray
+    Nch: np.ndarray
+    element_type: str = field(init=False, default='shower', repr=False)
 
-    def __init__(self,X: np.ndarray, Nch: np.ndarray):
-        self.X = X
-        self.Nch = Nch
-
-    def create(self):
+    def create(self) -> MakeUserShower:
         '''This method returns an instantiated user shower '''
-        return self.convert_to_iterable(MakeUserShower(self.X, self.Nch))
+        return MakeUserShower(self.X, self.Nch)
 
-class SphericalCounters(Element):
-    '''This is the implementation of the ground array element'''
-    element_type = 'counters'
+@dataclass
+class CountersParamsContainer:
+    '''Different counter types take the same params'''
+    vectors: np.ndarray
+    radius: float
+    element_type: str = field(init=False, default='counters', repr=False)
 
-    def __init__(self, input_vectors: np.ndarray, input_radius: float):
-        self.vectors = input_vectors
-        self.radius = input_radius
+@dataclass
+class SphericalCounters(CountersParamsContainer):
+    '''This is the implementation of the spherical counters array.'''
 
-    def create(self):
+    def create(self) -> MakeSphericalCounters:
+        '''This method returns an instantiated spherical counter array'''
+        return MakeSphericalCounters(self.vectors, self.radius)
+
+@dataclass
+class FlatCounters(CountersParamsContainer):
+    '''This is the implementation of the flat counters array'''
+
+    def create(self) -> MakeFlatCounters:
         '''This method returns an instantiated orbital array'''
-        return self.convert_to_iterable(MakeSphericalCounters(self.vectors, self.radius))
+        return MakeFlatCounters(self.vectors, self.radius)
 
-class FlatCounters(Element):
-    '''This is the implementation of the ground array element'''
-    element_type = 'counters'
-
-    def __init__(self, input_vectors: np.ndarray, input_radius: float):
-        self.vectors = input_vectors
-        self.radius = input_radius
-
-    def create(self):
-        '''This method returns an instantiated orbital array'''
-        return self.convert_to_iterable(MakeFlatCounters(self.vectors, self.radius))
-
-class Yield(Element):
+@dataclass
+class Yield:
     '''This is the implementation of the yield element'''
-    element_type = 'yield'
-
-    def __init__(self, l_min: float, l_max: float, N_bins: int = 1):
-        self.l_min = l_min
-        self.l_max = l_max
-        self.N_bins = N_bins
+    l_min: float
+    l_max: float
+    N_bins: int = 10
+    element_type: str = field(init=False, default='yield', repr=False)
 
     def make_lambda_bins(self):
         '''This method creates a list of bin low edges and a list of bin high
@@ -366,6 +311,7 @@ class ShowerSimulation:
         'counters': None,
         'yield': None
         }
+        self._has_run = False
 
     def add(self, element: Element):
         '''Add a element to the list of elements for the sim to perform'''
@@ -389,62 +335,39 @@ class ShowerSimulation:
     def n_tel(self):
         return self.ingredients['counters'][0].n_tel
     
-    # def run(self, mesh: bool = False):
-    #     '''This is the proprietary run method which creates the arrays of
-    #     Signal, Timing, and Attenuation objects
-    #     '''
-    #     shower = self.ingredients['shower'][0]
-    #     counters = self.ingredients['counters'][0]
-    #     y = self.ingredients['yield']
-    #     axis = self.ingredients['axis']
-    #     self.signals = np.empty_like(self.ingredients['axis'])
-    #     self.times = np.empty_like(self.ingredients['axis'])
-    #     self.attenuations = np.empty_like(self.ingredients['axis'])
-    #     if self.check_ingredients():
-    #         for i in range(axis.shape[0]):
-    #             for j in range(axis.shape[1]):
-    #                 if mesh:
-    #                     a = MeshAxis(axis[i,j],shower)
-    #                     s = MeshShower(a)
-    #                 else:
-    #                     a = axis[i,j]
-    #                     s = shower
-    #                 self.signals[i,j] = Signal(s, a, counters, y)
-    #                 self.times[i,j] = a.get_timing(a, counters)
-    #                 self.attenuations[i,j] = a.get_attenuation(a, counters, y)
-
     def run(self, mesh: bool = False):
         '''This is the proprietary run method which creates the arrays of
         Signal, Timing, and Attenuation objects
         '''
         if not self.check_ingredients():
             return None
-        shower = self.ingredients['shower'][0]
-        counters = self.ingredients['counters'][0]
-        y = self.ingredients['yield']
-        axis = self.ingredients['axis'][0,0]
+        self.shower = self.ingredients['shower']
+        self.counters = self.ingredients['counters']
+        self.y = self.ingredients['yield']
+        self.axis = self.ingredients['axis']
         if mesh:
-            lX_intervals = list(zip(self.lXs[:-1], self.lXs[1:]))
-            self.signals = np.empty((len(lX_intervals),1), dtype = 'O')
-            self.times = np.empty((len(lX_intervals),1), dtype = 'O')
-            self.attenuations = np.empty((len(lX_intervals),1), dtype = 'O')
-            for i, interval in enumerate(lX_intervals):
-                meshaxis = MeshAxis(interval,axis,shower)
+            self.signals = np.empty(len(self.lX_intervals), dtype = 'O')
+            self.times = np.empty_like(self.signals)
+            self.attenuations = np.empty_like(self.signals)
+            for i, interval in enumerate(self.lX_intervals):
+                meshaxis = MeshAxis(interval,self.axis,self.shower)
                 meshshower = MeshShower(meshaxis)
-                self.signals[i,0] = Signal(meshshower,meshaxis,counters,y)
-                self.times[i,0] = meshaxis.get_timing(counters)
-                self.attenuations[i,0] = meshaxis.get_attenuation(counters,y)
+                self.signals[i] = Signal(meshshower,meshaxis,self.counters,self.y)
+                self.times[i] = meshaxis.get_timing(self.counters)
+                self.attenuations[i] = meshaxis.get_attenuation(self.counters,self.y)
+                self.N_axis_points = meshaxis.r.size
         else:
-            self.signals = np.empty((1,1), dtype = 'O')
-            self.times = np.empty((1,1), dtype = 'O')
-            self.attenuations = np.empty((1,1), dtype = 'O')
-            self.signals[0,0] = Signal(shower,axis,counters,y)
-            self.times[0,0] = axis.get_timing(counters)
-            self.attenuations[0,0] = axis.get_attenuation(counters,y)
-        self.N_lX = self.signals[:,0].size
-        self.N_c = self.ingredients['counters'][0].N_counters
-        self.N_axis_points = np.size(self.signals[0,0].axis.altitude)
+            self.signals = np.empty(1, dtype = 'O')
+            self.times = np.empty(1, dtype = 'O')
+            self.attenuations = np.empty(1, dtype = 'O')
+            self.signals[0] = Signal(self.shower,self.axis,self.counters,self.y)
+            self.times[0] = self.axis.get_timing(self.counters)
+            self.attenuations[0] = self.axis.get_attenuation(self.counters,self.y)
+            self.N_axis_points = self.axis.r.size
+        self.N_lX = self.signals.size
+        self.N_c = self.counters.N_counters
         self.N_bunches = self.N_lX * self.N_axis_points
+        self._has_run = True
 
     def plot_profile(self):
         a = self.ingredients['axis'][0]
@@ -453,7 +376,7 @@ class ShowerSimulation:
         plt.figure()
         plt.plot(a.X, s.profile(a.X))
 
-    def get_photons_array(self, i=0, j=0):
+    def get_photons_array(self, i=0):
         '''This method returns the array of photons going from each step to
         each counter for each wavelength bin.
 
@@ -461,43 +384,43 @@ class ShowerSimulation:
         # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
-        return self.signals[i,j].calculate_ng()
+        return self.signals[i].calculate_ng()
 
-    def get_photons(self, i=0, j=0):
+    def get_photons(self, i=0):
         '''This method returns the un-attenuated number of photons going from
         each step to each counter.
 
         The returned array is of size:
         (# of counters, # of axis points)
         '''
-        photons_array = self.get_photons_array(i,j)
+        photons_array = self.get_photons_array(i)
         total_photons = np.zeros_like(photons_array[0])
         for photons in photons_array:
             total_photons += photons
         return total_photons
 
-    def get_photon_sum(self, i=0, j=0):
+    def get_photon_sum(self, i=0):
         '''This method returns the un-attenuated total number of photons going
         to each counter.
 
         The returned array is of size:
         (# of counters)
         '''
-        return self.get_photons(i,j).sum(axis=1)
+        return self.get_photons(i).sum(axis=1)
 
     def get_signal_sum(self):
-        sum = np.zeros(self.ingredients['counters'][0].r.size)
-        for i_s in range(self.signals[:,0].size):
+        sum = np.zeros(self.N_c)
+        for i_s in range(self.signals.size):
             sum += self.get_photon_sum(i=i_s)
         return sum
 
     def get_attenuated_signal_sum(self):
-        sum = np.zeros(self.ingredients['counters'][0].r.size)
-        for i_s in range(self.signals[:,0].size):
+        sum = np.zeros(self.N_c)
+        for i_s in range(self.signals.size):
             sum += self.get_attenuated_photon_sum(i=i_s)
         return sum
 
-    def get_times(self, i=0, j=0):
+    def get_times(self, i=0):
         '''This method returns the time it takes after the shower starts along
         the axis for each photon bin to hit each counter. It is simply calling
         the get_times() method from a specific Timing object.
@@ -505,7 +428,7 @@ class ShowerSimulation:
         The size of the returned array is of shape:
         (# of counters, # of axis points)
         '''
-        return self.times[i,j].counter_time()
+        return self.times[i].counter_time()
 
     def get_photon_timebins(self, i_counter, t_min, t_max, N_bins):
         '''This method takes the arrival times of photons from each lX axis and
@@ -555,20 +478,18 @@ class ShowerSimulation:
             i_s += self.N_axis_points
         return times_array
 
-    # def get_attenuated_signal_times(self):
-    #     '''This method takes the times at which each photon bunch arrives and
-    #     combines them into one array.
-    #     '''
-    #     N_lX = self.signals[:,0].size
-    #     N_c = self.ingredients['counters'][0].N_counters
-    #     times_array = np.zeros((N_c, 1))
-    #     photons_array = np.zeros_like(times_array)
-    #     for i_s in range(N_lX):
-    #         times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
-    #         photons_array = np.append(photons_array, self.get_attenuated_photons(i=i_s), axis = 1)
-    #     return times_array, photons_array
+    def get_attenuated_signal_times(self):
+        '''This method takes the times at which each photon bunch arrives and
+        combines them into one array.
+        '''
+        times_array = np.zeros(self.N_c)
+        photons_array = np.zeros_like(times_array)
+        for i_s in range(self.N_lX):
+            times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
+            photons_array = np.append(photons_array, self.get_attenuated_photons(i=i_s), axis = 1)
+        return times_array, photons_array
 
-    def get_attenuated_photons_array(self, i=0, j=0):
+    def get_attenuated_photons_array(self, i=0):
         '''This method returns the attenuated number of photons going from each
         step to each counter.
 
@@ -576,41 +497,41 @@ class ShowerSimulation:
         # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
-        fraction_array = self.attenuations[i,j].fraction_passed()
-        photons_array = self.get_photons_array(i,j)
+        fraction_array = self.attenuations[i].fraction_passed()
+        photons_array = self.get_photons_array(i)
         attenuated_photons = np.zeros_like(photons_array)
-        for i, (photons, fractions) in enumerate(zip(photons_array, fraction_array)):
-            attenuated_photons[i] = photons * fractions
+        for i_a, (photons, fractions) in enumerate(zip(photons_array, fraction_array)):
+            attenuated_photons[i_a] = photons * fractions
         return attenuated_photons
 
-    def get_attenuated_photons(self, i=0, j=0):
+    def get_attenuated_photons(self, i=0):
         '''This method returns the attenuated number of photons going from each
         step to each counter.
 
         The returned array is of size:
         (# of counters, # of axis points)
         '''
-        fraction_array = self.attenuations[i,j].fraction_passed()
-        photons_array = self.get_photons_array(i,j)
+        fraction_array = self.attenuations[i].fraction_passed()
+        photons_array = self.get_photons_array(i)
         attenuated_photons = np.zeros_like(photons_array[0])
         for photons, fractions in zip(photons_array, fraction_array):
             attenuated_photons += photons * fractions
         return attenuated_photons
 
-    def get_attenuated_photon_sum(self, i=0, j=0):
+    def get_attenuated_photon_sum(self, i=0):
         '''This method returns the attenuated total number of photons going to
         each counter.
 
         The returned array is of size:
         (# of counters)
         '''
-        return self.get_attenuated_photons(i,j).sum(axis=1)
+        return self.get_attenuated_photons(i).sum(axis=1)
 
-    def get_attenuated_signal_sum(self):
-        sum = np.zeros(self.ingredients['counters'][0].r.size)
-        for i_s in range(self.signals[:,0].size):
-            sum += self.get_attenuated_photon_sum(i=i_s)
-        return sum
+    # def get_attenuated_signal_sum(self):
+    #     sum = np.zeros(self.N_c)
+    #     for i_s in range(self.signals.size):
+    #         sum += self.get_attenuated_photon_sum(i=i_s)
+    #     return sum
 
     def mean_dE_dX(self, X: np.ndarray, i_s: int=0) -> np.ndarray:
         '''This method wraps the simulation shower's avg stopping power method.

@@ -1,3 +1,4 @@
+from typing import Protocol
 import numpy as np
 from abc import ABC, abstractmethod
 from importlib.resources import as_file, files
@@ -115,6 +116,21 @@ class Counters(ABC):
         counter_length = np.broadcast_to(self.r, travel_length.T.shape).T
         return self.law_of_cosines(axis_length, travel_length, counter_length)
 
+class AxisParams(Protocol):
+    '''This is the protocol for an axis parameter container.
+    '''
+    @property
+    def zenith(self) -> float:
+        ...
+
+    @property
+    def azimuth(self) -> float:
+        ...
+    
+    @property
+    def ground_level(self) -> float:
+        ...
+
 class Axis(ABC):
     '''This is the abstract base class which contains the methods for computing
     the cartesian vectors and corresponding slant depths of an air shower'''
@@ -123,12 +139,12 @@ class Axis(ABC):
     lX = -100. #This is the default value for the distance to the axis in log moliere units (in this case log(-inf) = 0, or on the axis)
     
 
-    def __init__(self, zenith: float, azimuth: float, ground_level: float = 0., config: AxisConfig = AxisConfig()):
-        self.config = config
-        self.atm = config.ATM
-        self.ground_level = ground_level
-        self.zenith = zenith
-        self.azimuth = azimuth
+    def __init__(self, params: AxisParams):
+        self.config = AxisConfig()
+        self.atm = self.config.ATM
+        self.ground_level = params.ground_level
+        self.zenith = params.zenith
+        self.azimuth = params.azimuth
 
     @property
     def zenith(self):
