@@ -478,16 +478,16 @@ class ShowerSimulation:
             i_s += self.N_axis_points
         return times_array
 
-    def get_attenuated_signal_times(self):
-        '''This method takes the times at which each photon bunch arrives and
-        combines them into one array.
-        '''
-        times_array = np.zeros(self.N_c)
-        photons_array = np.zeros_like(times_array)
-        for i_s in range(self.N_lX):
-            times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
-            photons_array = np.append(photons_array, self.get_attenuated_photons(i=i_s), axis = 1)
-        return times_array, photons_array
+    # def get_attenuated_signal_times(self):
+    #     '''This method takes the times at which each photon bunch arrives and
+    #     combines them into one array.
+    #     '''
+    #     times_array = np.zeros(self.N_c)
+    #     photons_array = np.zeros_like(times_array)
+    #     for i_s in range(self.N_lX):
+    #         times_array = np.append(times_array, self.get_times(i=i_s), axis = 1)
+    #         photons_array = np.append(photons_array, self.get_attenuated_photons(i=i_s), axis = 1)
+    #     return times_array, photons_array
 
     def get_attenuated_photons_array(self, i=0):
         '''This method returns the attenuated number of photons going from each
