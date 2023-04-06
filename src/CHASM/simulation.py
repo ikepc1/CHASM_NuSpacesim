@@ -123,7 +123,6 @@ class AxisParamContainer:
     azimuth: float
     ground_level: float = 0.
     curved: bool = False
-    mesh: bool = False
     element_type: str = field(init=False, default='axis', repr=False)
 
 @dataclass

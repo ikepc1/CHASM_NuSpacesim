@@ -46,15 +46,15 @@ def sample_downward_axis_params():
 
 
 @pytest.fixture
-def sample_downward_fp_axis():
+def sample_downward_fp_axis(sample_downward_axis_params):
     '''Return instantiated downward axis with fp atm axis.'''
-    return DownwardAxis(np.radians(30.),np.radians(45.),0).create()
+    return DownwardAxis(*sample_downward_axis_params.values()).create()
 
 @pytest.fixture
 def sample_downward_curved_axis(sample_downward_axis_params):
     '''Return instantiated downward axis with curved atm axis.'''
     
-    return MakeDownwardAxisCurvedAtm(*sample_downward_axis_params.values())
+    return DownwardAxis(*sample_downward_axis_params.values(),curved=True).create()
 
 @pytest.fixture
 def sample_upward_axis_params():
@@ -68,12 +68,12 @@ def sample_upward_axis_params():
 @pytest.fixture
 def sample_upward_fp_axis(sample_upward_axis_params):
     '''Returns instantiated upward axis with fp atm.'''
-    return MakeUpwardAxisFlatPlanarAtm(*sample_upward_axis_params.values())
+    return UpwardAxis(*sample_upward_axis_params.values()).create()
 
 @pytest.fixture
 def sample_upward_curved_axis(sample_upward_axis_params):
     '''Returns instantiated upward axis with curved atm.'''
-    return MakeUpwardAxisCurvedAtm(*sample_upward_axis_params.values())
+    return UpwardAxis(*sample_upward_axis_params.values(),curved=True).create()
 
 @pytest.fixture
 def sample_ground_array_geometry():
