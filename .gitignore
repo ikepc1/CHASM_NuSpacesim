@@ -26,4 +26,4 @@ eggs
 _version.py
 .tox
 *.ipynb
-
+src/CHASM/comp_tests.py
