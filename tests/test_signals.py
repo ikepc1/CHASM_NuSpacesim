@@ -1,4 +1,4 @@
-from CHASM.simulation import *
+import CHASM as ch
 import numpy as np
 import pytest
 
@@ -6,7 +6,7 @@ def test_GH_shower(sample_GH_params):
     '''This test creates a GH shower object and tests the profile method to
     make sure it produces valid particle count values (no nan or negative).
     '''
-    shower = MakeGHShower(*sample_GH_params.values())
+    shower = ch.MakeGHShower(*sample_GH_params.values())
     Xs = np.linspace(0,1000,100)
     nch = shower.profile(Xs)
     assert np.size(nch[np.isnan(nch)]) == 0
@@ -16,7 +16,7 @@ def test_user_shower(sample_usershower_params):
     '''This test creates a user shower object and tests the profile method to
     make sure it produces valid particle count values (no nan or negative).
     '''
-    shower = MakeUserShower(*sample_usershower_params.values())
+    shower = ch.MakeUserShower(*sample_usershower_params.values())
     Xs = np.linspace(0,1000,100)
     nch = shower.profile(Xs)
     assert np.size(nch[np.isnan(nch)]) == 0
@@ -32,19 +32,19 @@ def signal_from_ingredients(shower:str,axis:str,counters:str,cyield:str,request)
     a = request.getfixturevalue(axis)
     c = request.getfixturevalue(counters)
     y = request.getfixturevalue(cyield)
-    return Signal(s,a,c,y)
+    return ch.Signal(s,a,c,y)
 
 def meshsignal_from_ingredients(shower:str,axis:str,counters:str,cyield:str,request):
     '''This function creaates a basic signal from the fixture names'''
     linear_shower = request.getfixturevalue(shower)
     linear_axis = request.getfixturevalue(axis)
-    a = MeshAxis((-6.,0.),linear_axis,linear_shower)
-    s = MeshShower(a)
+    a = ch.MeshAxis((-6.,0.),linear_axis,linear_shower)
+    s = ch.MeshShower(a)
     c = request.getfixturevalue(counters)
     y = request.getfixturevalue(cyield)
-    return Signal(s,a,c,y)
+    return ch.Signal(s,a,c,y)
 
-def signal_checks(signal: Signal):
+def signal_checks(signal: ch.Signal):
     '''This function performs the checks on a signal object'''
     ng = signal.calculate_ng()[0]
     assert np.size(ng[np.isnan(ng)]) == 0
@@ -100,12 +100,12 @@ def mesh_timing_from_ingredients(shower: str, axis: str, counters: str, request)
     '''This function creates a mesh timing object from the fixture names.'''
     linear_shower = request.getfixturevalue(shower)
     linear_axis = request.getfixturevalue(axis)
-    a = MeshAxis((-6.,0.),linear_axis,linear_shower)
-    s = MeshShower(a)
+    a = ch.MeshAxis((-6.,0.),linear_axis,linear_shower)
+    s = ch.MeshShower(a)
     c = request.getfixturevalue(counters)
     return a.get_timing(c)
 
-def timing_checks(timing: Timing):
+def timing_checks(timing: ch.Timing):
     '''This function performs the check on a Timing object.'''
     t = timing.counter_time()
     assert np.size(t[np.isnan(t)]) == 0
@@ -151,13 +151,13 @@ def mesh_attenuation_from_ingredients(shower: str, axis: str, counters: str, cyi
     '''This function creates a mesh attenuation object from the fixture names.'''
     linear_shower = request.getfixturevalue(shower)
     linear_axis = request.getfixturevalue(axis)
-    a = MeshAxis((-6.,0.),linear_axis,linear_shower)
-    s = MeshShower(a)
+    a = ch.MeshAxis((-6.,0.),linear_axis,linear_shower)
+    s = ch.MeshShower(a)
     c = request.getfixturevalue(counters)
     y = request.getfixturevalue(cyield)
     return a.get_attenuation(c, y)
 
-def attenuation_checks(attenuation: Attenuation):
+def attenuation_checks(attenuation: ch.Attenuation):
     '''This function performs the check on an attenuation object.'''
     f = attenuation.fraction_passed()[0]
     assert np.size(f[np.isnan(f)]) == 0

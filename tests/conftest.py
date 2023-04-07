@@ -1,5 +1,4 @@
-from CHASM.simulation import *
-# from CHASM.axis import *
+import CHASM as ch
 
 import numpy as np
 from scipy.stats import norm
@@ -18,7 +17,7 @@ def sample_GH_params():
 @pytest.fixture
 def sample_GH_shower(sample_GH_params):
     '''Return an instantiated GH shower object.'''
-    return MakeGHShower(*sample_GH_params.values())
+    return ch.MakeGHShower(*sample_GH_params.values())
 
 @pytest.fixture
 def sample_usershower_params():
@@ -33,7 +32,7 @@ def sample_usershower_params():
 @pytest.fixture
 def sample_user_shower(sample_usershower_params):
     '''Return an instantiated User shower object.'''
-    return MakeUserShower(*sample_usershower_params.values())
+    return ch.MakeUserShower(*sample_usershower_params.values())
 
 @pytest.fixture
 def sample_downward_axis_params():
@@ -48,13 +47,13 @@ def sample_downward_axis_params():
 @pytest.fixture
 def sample_downward_fp_axis(sample_downward_axis_params):
     '''Return instantiated downward axis with fp atm axis.'''
-    return DownwardAxis(*sample_downward_axis_params.values()).create()
+    return ch.DownwardAxis(*sample_downward_axis_params.values()).create()
 
 @pytest.fixture
 def sample_downward_curved_axis(sample_downward_axis_params):
     '''Return instantiated downward axis with curved atm axis.'''
     
-    return DownwardAxis(*sample_downward_axis_params.values(),curved=True).create()
+    return ch.DownwardAxis(*sample_downward_axis_params.values(),curved=True).create()
 
 @pytest.fixture
 def sample_upward_axis_params():
@@ -68,12 +67,12 @@ def sample_upward_axis_params():
 @pytest.fixture
 def sample_upward_fp_axis(sample_upward_axis_params):
     '''Returns instantiated upward axis with fp atm.'''
-    return UpwardAxis(*sample_upward_axis_params.values()).create()
+    return ch.UpwardAxis(*sample_upward_axis_params.values()).create()
 
 @pytest.fixture
 def sample_upward_curved_axis(sample_upward_axis_params):
     '''Returns instantiated upward axis with curved atm.'''
-    return UpwardAxis(*sample_upward_axis_params.values(),curved=True).create()
+    return ch.UpwardAxis(*sample_upward_axis_params.values(),curved=True).create()
 
 @pytest.fixture
 def sample_ground_array_geometry():
@@ -92,12 +91,12 @@ def sample_ground_array_geometry():
 @pytest.fixture
 def sample_spherical_ground_array(sample_ground_array_geometry):
     '''Returns instantiated spherical ground array.'''
-    return MakeSphericalCounters(*sample_ground_array_geometry.values())
+    return ch.MakeSphericalCounters(*sample_ground_array_geometry.values())
 
 @pytest.fixture
 def sample_flat_ground_array(sample_ground_array_geometry):
     '''Returns instantiated flat ground array.'''
-    return MakeFlatCounters(*sample_ground_array_geometry.values())
+    return ch.MakeFlatCounters(*sample_ground_array_geometry.values())
 
 @pytest.fixture
 def sample_orbital_array_geometry():
@@ -125,12 +124,12 @@ def sample_orbital_array_geometry():
 @pytest.fixture
 def sample_spherical_orbital_array(sample_orbital_array_geometry):
     '''Returns instantiated spherical ground array.'''
-    return MakeSphericalCounters(*sample_orbital_array_geometry.values())
+    return ch.MakeSphericalCounters(*sample_orbital_array_geometry.values())
 
 @pytest.fixture
 def sample_flat_orbital_array(sample_orbital_array_geometry):
     '''Returns instantiated flat ground array.'''
-    return MakeFlatCounters(*sample_orbital_array_geometry.values())
+    return ch.MakeFlatCounters(*sample_orbital_array_geometry.values())
 
 @pytest.fixture
 def sample_yield_interval():
@@ -143,4 +142,4 @@ def sample_yield_interval():
 @pytest.fixture
 def sample_yield(sample_yield_interval):
     '''Returns list with an instantiated yield object.'''
-    return [MakeYield(*sample_yield_interval.values())]
+    return [ch.MakeYield(*sample_yield_interval.values())]

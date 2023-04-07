@@ -3,9 +3,9 @@ import numpy as np
 # from datetime import datetime
 # import struct
 
-from .eventio_types import *
-from .simulation import ShowerSimulation, Signal
+from .simulation import ShowerSimulation
 from .block_data import *
+from .eventio_types import EventioType
 
 SYNC_MARKER = b'\x37\x8a\x1f\xd4'
 IACT_TYPES = {
@@ -25,23 +25,6 @@ IACT_TYPES = {
     'RunEnd':1210,   
 }
 
-IACT_NEEDS_SIM = {
-    'RunHeader':False,
-    'InputCard':False,
-    'AtmosphericProfile':False,
-    'TelescopeDefinition':True,
-    'EventHeader':True,
-    'ArrayOffsets':True,
-    'Longitudinal':True,
-    'TelescopeData':True,
-    # 'Photons':True,
-    # 'CameraLayout':True,
-    # 'TriggerTime':1207,
-    # 'PhotoElectrons':1208,
-    'EventEnd':False,
-    'RunEnd':False,   
-}
-
 IACT_OBJECTS = {
     'RunHeader': RunHeaderData,
     'InputCard': InputCardData,
@@ -51,23 +34,53 @@ IACT_OBJECTS = {
     'ArrayOffsets': ArrayOffsetsData,
     'Longitudinal': LongitudinalData,
     'TelescopeData': TelescopeData,
-    # 'Photons': PhotonsData,
-    # 'CameraLayout': CameraLayoutData,
-    # 'TriggerTime': TriggerTimeData,
-    # 'PhotoElectrons': PhotoElectrons,
+    'Photons': PhotonsData,
+    'CameraLayout': CameraLayoutData,
+    'TriggerTime': TriggerTimeData,
+    'PhotoElectrons': PhotoElectrons,
     'EventEnd': EventEnd,
     'RunEnd': RunEnd,   
 }
+
+def value_list(block_data: dataclass) -> list[EventioType]:
+    '''This property is the attributes in a block dataclass as a list in 
+    the correct order.
+    '''
+    value_list = []
+    for field in fields(block_data):
+        attr = getattr(block_data, field.name)
+        if type(attr) == list:
+            value_list.extend(attr)
+        else:
+            value_list.append(attr)
+    return value_list
+
+def append_EIType_to_buffer(buffer: bytearray, eitype: EventioType) -> None:
+    '''This function appends the Eventio style bytes representing the datatype to
+    a bytearray.
+    '''
+    buffer.extend(eitype.to_bytes())
+
+def block_to_bytes(block_data: dataclass) -> bytearray:
+    '''This function takes the values in a block data dataclass container and writes
+    them to a bytearray.
+    '''
+    values =  value_list(block_data)
+    byte_buffer = bytearray()
+    for value in values:
+        append_EIType_to_buffer(byte_buffer, value)
+    return byte_buffer
 
 def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
     '''This function instantiates the data block containers.
     '''
     block_dict = {
-    'RunHeader': RunHeaderData,
-    'InputCard': InputCardData,
-    'AtmosphericProfile': AtmosphericProfileData,}
-    block_dict['TelescopeDefinition'] = TelescopeDefinitionData(sim.n_tel,
-                                                                Float(0),)
+    # 'RunHeader': RunHeaderData(),
+    # 'InputCard': InputCardData(),
+    # 'AtmosphericProfile': AtmosphericProfileData(),
+    }
+    block_dict['TelescopeDefinition'] = make_tel_def(sim)
+    return block_dict
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
     '''This function writes the header bytes for an eventio file. These 16 
@@ -91,15 +104,13 @@ def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
 class ImproperBlockSize(Exception):
     pass
 
-def eventio_bytes() -> bytearray:
+def eventio_bytes(sim: ShowerSimulation) -> bytearray:
     '''This function returns the byte buffer of a mocked eventio file.
     '''
     byte_buffer = bytearray()
-    for block_type in IACT_OBJECTS:
-        block_bytes = block_to_bytes(IACT_OBJECTS[block_type]())
+    data_blocks = create_data_blocks(sim)
+    for block_type in data_blocks:
+        block_bytes = block_to_bytes(data_blocks[block_type])
         byte_buffer.extend(object_header_bytes(IACT_TYPES[block_type], len(block_bytes)))
         byte_buffer.extend(block_bytes)
     return byte_buffer
-
-if __name__ == '__main__':
-    ev_bytes = eventio_bytes()

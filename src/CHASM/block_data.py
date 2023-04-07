@@ -1,44 +1,27 @@
 from dataclasses import dataclass, field, fields
 from datetime import datetime
 import struct
+import numpy as np
 
-from .eventio_types import *
+from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring
 from .config import AxisConfig
-
-def value_list(block_data: dataclass) -> list[EventioType]:
-    '''This property is the attributes in a block dataclass as a list in 
-    the correct order.
-    '''
-    value_list = []
-    for field in fields(block_data):
-        attr = getattr(block_data, field.name)
-        if type(attr) == list:
-            value_list.extend(attr)
-        else:
-            value_list.append(attr)
-    return value_list
-
-def append_EIType_to_buffer(buffer: bytearray, eitype: EventioType) -> None:
-    '''This function appends the Eventio style bytes representing the datatype to
-    a bytearray.
-    '''
-    buffer.extend(eitype.to_bytes())
-
-def block_to_bytes(block_data: dataclass) -> bytearray:
-    '''This function takes the values in a block data dataclass container and writes
-    them to a bytearray.
-    '''
-    values =  value_list(block_data)
-    byte_buffer = bytearray()
-    for value in values:
-        append_EIType_to_buffer(byte_buffer, value)
-    return byte_buffer
+from .simulation import ShowerSimulation
+from .axis import Axis, Counters
+from .shower import Shower
+from .generate_Cherenkov import MakeYield
 
 def date_to_float() -> Float:
     '''This function takes the current date and returns it as a float in YYMMDD
     format for the run header.
     '''
     return Float(float(datetime.now().strftime("%y%m%d")))
+
+def array_to_eventio_list(arr: np.ndarray, type: EventioType) -> list[EventioType]:
+    '''This function takes a 2d numpy array and converts the values into
+    a list of corresponding eventiotypes in the correct order for use in the
+    bytestream.
+    '''
+    return [type(val) for val in arr.flatten().tolist()]
 
 def consts_and_int_flags() -> list[Float]:
     '''This function returns the list of constants and interaction flags for words
@@ -168,7 +151,7 @@ def atm_table() -> list[Double]:
     atm_array[:,1] = atm.density(atm.altitudes) / 1.e3 #to g/cm^3
     atm_array[:,2] = atm.thickness()
     atm_array[:,3] = atm.delta(atm.altitudes)
-    return [Double(val) for val in atm_array.flatten().tolist()]
+    return array_to_eventio_list(atm_array, Double)
 
 def five_layer() -> list[Double]:
     pass
@@ -193,7 +176,21 @@ class TelescopeDefinitionData:
     '''
     n_tel: Varint
     empty_word: Float
+    tel_x: list[Float]
+    tel_y: list[Float]
+    tel_z: list[Float]
+    tel_r: list[Float]
 
+def make_tel_def(sim: ShowerSimulation) -> TelescopeDefinitionData:
+    '''This function returns an instantiated Telescope definition
+     data block container.
+    '''
+    vectors_cm = sim.counters.vectors * 100.
+    x = [Float(val) for val in vectors_cm[:,0].tolist()]
+    y = [Float(val) for val in vectors_cm[:,1].tolist()]
+    z = [Float(val) for val in vectors_cm[:,2].tolist()]
+    r = [Float(val) for val in np.full(sim.N_c,sim.counters.input_radius*100.).tolist()]
+    return TelescopeDefinitionData(Varint(sim.N_c),Float(0.),x,y,z,r)
 
 @dataclass
 class EventHeaderData:

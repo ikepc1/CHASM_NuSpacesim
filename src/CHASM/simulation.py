@@ -1,12 +1,10 @@
-from abc import ABC, abstractmethod
 from typing import Protocol
-from dataclasses import dataclass, field
-import matplotlib.pyplot as plt
 import eventio
+import numpy as np
 
-from .shower import *
-from .axis import *
-from .generate_Cherenkov import *
+from .shower import Shower
+from .axis import Axis, Counters, MeshAxis, MeshShower
+from .generate_Cherenkov import MakeYield
 from .cherenkov_photon_array import CherenkovPhotonArray
 
 #Wrap eventio for extraction of CORSIKA shower data.
@@ -104,126 +102,10 @@ class EventioWrapper(eventio.IACTFile):
             p_e = np.append(p_e,p)
         return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
 
-class Element(Protocol):
-    '''This is the protocol for a simulation element. It needs a type, either
-    axis, shower, counters, or yield'''
-    @property
-    def element_type(self):
-        ...
-
-    def create(self) -> object:
-        ...
-
-@dataclass
-class AxisParamContainer:
-    '''This is the base class for axis params since both upward
-    and downward axes have the same parameters.
-    '''
-    zenith: float
-    azimuth: float
-    ground_level: float = 0.
-    curved: bool = False
-    element_type: str = field(init=False, default='axis', repr=False)
-
-@dataclass
-class DownwardAxis(AxisParamContainer):
-    '''This is the container for a user-defined downward axis' parameters.
-    '''
-    def create(self) -> MakeDownwardAxis:
-        '''This method returns the instantiated axis object.
-        '''
-        if self.curved:
-            return MakeDownwardAxisCurvedAtm(self)
-        else:
-            return MakeDownwardAxisFlatPlanarAtm(self)
-    
-@dataclass
-class UpwardAxis(AxisParamContainer):
-    '''This is the container for a user-defined upward axis' parameters.
-    '''
-    def create(self) -> MakeUpwardAxis:
-        '''This method returns the instantiated axis object.
-        '''
-        if self.curved:
-            return MakeUpwardAxisCurvedAtm(self)
-        else:
-            return MakeUpwardAxisFlatPlanarAtm(self)
-
-@dataclass
-class GHShower:
-    '''This is the GH shower ingredient parameter container/factory'''
-    X_max: float
-    N_max: float
-    X0: float
-    Lambda: float
-    element_type: str = field(init=False, default='shower', repr=False)
-
-    def create(self) -> MakeGHShower:
-        '''This method returns an instantiated Gaisser Hillas Shower '''
-        return MakeGHShower(self.X_max, self.N_max, self.X0, self.Lambda)
-
-@dataclass
-class UserShower:
-    '''This is the implementation of the GH shower element'''
-    X: np.ndarray
-    Nch: np.ndarray
-    element_type: str = field(init=False, default='shower', repr=False)
-
-    def create(self) -> MakeUserShower:
-        '''This method returns an instantiated user shower '''
-        return MakeUserShower(self.X, self.Nch)
-
-@dataclass
-class CountersParamsContainer:
-    '''Different counter types take the same params'''
-    vectors: np.ndarray
-    radius: float
-    element_type: str = field(init=False, default='counters', repr=False)
-
-@dataclass
-class SphericalCounters(CountersParamsContainer):
-    '''This is the implementation of the spherical counters array.'''
-
-    def create(self) -> MakeSphericalCounters:
-        '''This method returns an instantiated spherical counter array'''
-        return MakeSphericalCounters(self.vectors, self.radius)
-
-@dataclass
-class FlatCounters(CountersParamsContainer):
-    '''This is the implementation of the flat counters array'''
-
-    def create(self) -> MakeFlatCounters:
-        '''This method returns an instantiated orbital array'''
-        return MakeFlatCounters(self.vectors, self.radius)
-
-@dataclass
-class Yield:
-    '''This is the implementation of the yield element'''
-    l_min: float
-    l_max: float
-    N_bins: int = 10
-    element_type: str = field(init=False, default='yield', repr=False)
-
-    def make_lambda_bins(self):
-        '''This method creates a list of bin low edges and a list of bin high
-        edges'''
-        bin_edges = np.linspace(self.l_min, self.l_max, self.N_bins+1)
-        return bin_edges[:-1], bin_edges[1:]
-
-    def create(self):
-        '''This method returns an instantiated yield object'''
-        bin_minimums, bin_maximums = self.make_lambda_bins()
-        yield_array = np.empty_like(bin_minimums, dtype = 'O')
-        for i, (min, max) in enumerate(zip(bin_minimums, bin_maximums)):
-            yield_array[i] = MakeYield(min, max)
-        return yield_array
-
 class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
     given counters
     '''
-    # table_file = 'gg_t_delta_theta_doubled.npz'
-    # gga = CherenkovPhotonArray(table_file)
 
     def __init__(self, shower: Shower, axis: Axis, counters: Counters, yield_array: np.ndarray):
         self.shower = shower
@@ -296,6 +178,16 @@ class Signal:
             ng_array[i] = gg * self.calculate_yield(y) * self.omega
         return ng_array
 
+class Element(Protocol):
+    '''This is the protocol for a simulation element. It needs a type, either
+    axis, shower, counters, or yield'''
+    @property
+    def element_type(self):
+        ...
+
+    def create(self) -> object:
+        ...
+
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
     # lXs = np.arange(-4,1)
@@ -331,9 +223,41 @@ class ShowerSimulation:
         return True
 
     @property
-    def n_tel(self):
-        return self.ingredients['counters'][0].n_tel
+    def shower(self) -> Shower:
+        '''Simulation shower property'''
+        return self._shower
     
+    @shower.setter
+    def shower(self, shower: Shower) -> None:
+        self._shower = shower
+
+    @property
+    def axis(self) -> Axis:
+        '''Simulation axis property'''
+        return self._axis
+    
+    @axis.setter
+    def axis(self, axis: Axis) -> None:
+        self._axis = axis
+    
+    @property
+    def y(self) -> np.ndarray[MakeYield]:
+        '''Simulation yield property'''
+        return self._y
+    
+    @y.setter
+    def y(self, y: np.ndarray[MakeYield]) -> None:
+        self._y = y
+
+    @property
+    def counters(self) -> Counters:
+        '''Simulation counters property'''
+        return self._counters
+    
+    @counters.setter
+    def counters(self, counters: Counters) -> None:
+        self._counters = counters
+
     def run(self, mesh: bool = False):
         '''This is the proprietary run method which creates the arrays of
         Signal, Timing, and Attenuation objects
@@ -367,13 +291,6 @@ class ShowerSimulation:
         self.N_c = self.counters.N_counters
         self.N_bunches = self.N_lX * self.N_axis_points
         self._has_run = True
-
-    def plot_profile(self):
-        a = self.ingredients['axis'][0]
-        s = self.ingredients['shower'][0]
-        plt.ion()
-        plt.figure()
-        plt.plot(a.X, s.profile(a.X))
 
     def get_photons_array(self, i=0):
         '''This method returns the array of photons going from each step to
@@ -525,101 +442,3 @@ class ShowerSimulation:
         (# of counters)
         '''
         return self.get_attenuated_photons(i).sum(axis=1)
-
-    # def get_attenuated_signal_sum(self):
-    #     sum = np.zeros(self.N_c)
-    #     for i_s in range(self.signals.size):
-    #         sum += self.get_attenuated_photon_sum(i=i_s)
-    #     return sum
-
-    def mean_dE_dX(self, X: np.ndarray, i_s: int=0) -> np.ndarray:
-        '''This method wraps the simulation shower's avg stopping power method.
-        '''
-        shower = self.ingredients['shower'][i_s]
-        return shower.dE_dX(X)
-
-if __name__ == '__main__':
-    import numpy as np
-    from .shower import *
-    plt.ion()
-
-    # theta = np.linspace(.01, np.radians(80),100)
-    # phi = np.linspace(0, 1.999*np.pi, 10)
-    theta = np.radians(50)
-    phi = np.radians(135)
-
-    x = np.linspace(-1000,1000,100)
-    xx, yy = np.meshgrid(x,x)
-    counters = np.empty([xx.size,3])
-    counters[:,0] = xx.flatten()
-    counters[:,1] = yy.flatten()
-    counters[:,2] = np.zeros(xx.size)
-
-    sim = ShowerSimulation()
-    sim.add(DownwardAxis(theta,phi))
-    sim.add(GHShower(666.,6e7,0.,70.))
-    sim.add(FlatCounters(counters, 1.))
-    sim.add(Yield(200,205,1))
-    sim.run(mesh=True)
-
-    fig = plt.figure()
-    h2d = plt.hist2d(counters[:,0],counters[:,1],weights=sim.get_signal_sum(),bins=100, cmap=plt.cm.jet)
-    # plt.title('Cherenkov Upward Shower footprint at ~500km')
-    plt.xlabel('Counter Plane X-axis (km)')
-    plt.ylabel('Counter Plane Y-axis (km)')
-    ax = plt.gca()
-    ax.set_aspect('equal')
-    plt.colorbar(label = 'Number of Cherenkov Photons')
-
-    # axis =  sim.ingredients['axis'][0,0]
-    # shower = sim.ingredients['shower'][0]
-    # counters = sim.ingredients['counters'][0]
-    # y = sim.ingredients['yield']
-    # ma = MeshAxis(axis, shower)
-    # ms = MeshShower(ma)
-    # # mesh_axis, r, t, d = axis_to_mesh(axis,shower)
-    # # rotated_mesh_axis = rotate_mesh(mesh_axis, axis.zenith, axis.azimuth)
-    # ax = fig.add_axes([0, 0, 1, 1], projection='3d')
-    # ax.scatter(ma.rotated_mesh[:,0],ma.rotated_mesh[:,1],ma.rotated_mesh[:,2],s=.1)
-    # ax.scatter(ma.vectors[:,0],ma.vectors[:,1],ma.vectors[:,2],c=ma.nch/ma.nch.max())
-    # ax.scatter(axis.vectors[:,0],axis.vectors[:,1],axis.vectors[:,2],s=.5)
-    # ax.set_xlim(-1000,1000)
-    # ax.set_ylim(-1000,1000)
-    # ax.set_zlim(0,6000)
-    # ax.set_xlabel('x (m)')
-    # ax.set_ylabel('y (m)')
-    # ax.set_zlabel('z (m)')
-
-
-    # counters = np.empty([100,3])
-    #
-    # theta = np.radians(85)
-    # phi = 0.
-    # r = 2141673.2772862054
-    #
-    # x = r * np.sin(theta) * np.cos(phi)
-    # y = r * np.sin(theta) * np.sin(phi)
-    # z = r * np.cos(theta)
-    #
-    # counters[:,0] = np.full(100,x)
-    # counters[:,1] = np.linspace(y-100.e3,y+100.e3,100)
-    # counters[:,2] = np.full(100,z)
-    #
-    # area = 1
-    #
-    # sim = ShowerSimulation()
-    # sim.add(UpwardAxis(theta,phi))
-    # sim.add(GHShower(666.,6e7,0.,70.))
-    # sim.add(Counters(counters, area))
-    # sim.add(Yield(300,450))
-    # sim.run(curved = True)
-    #
-    # s = sim.signals[0,0]
-    # ng = s.calculate_ng()
-    # plt.figure()
-    # plt.plot(s.counters.vectors[:,1],ng.sum(axis=1),label='no attenuation')
-    # ng_att = ng * s.axis.get_attenuation(s.counters, s.y).fraction_passed()
-    # ng_att_curved = ng * s.axis.get_curved_attenuation(s.counters, s.y).fraction_passed()
-    # plt.plot(s.counters.vectors[:,1],ng_att.sum(axis=1), label='flat attenuation')
-    # plt.plot(s.counters.vectors[:,1],ng_att_curved.sum(axis=1), label='curved attenuation')
-    # plt.legend()
