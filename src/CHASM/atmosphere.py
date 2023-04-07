@@ -127,7 +127,6 @@ class USStandardAtmosphere(Atmosphere):
     """
 
     # Class constants for 1976 US Standard Atmosphere
-    name = 'USSTANDARDATM1976'
     temperature_sea_level = 288.15    # K
     pressure_sea_level    = 101325    # Pa
     density_sea_level     = 1.225     # kg/m3
@@ -171,6 +170,7 @@ class USStandardAtmosphere(Atmosphere):
             self.temp_gradient = temp_gradient
         self.maximum_height = self.altitudes[-1]
         self.minimum_height = self.altitudes[0]
+        self.name = 'USSTANDARDATM1976'
 
     @property
     def name(self):
