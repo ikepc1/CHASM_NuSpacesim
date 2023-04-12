@@ -293,6 +293,16 @@ class ArrayOffsetsData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     array offsets block.
     '''
+    n_offsets: Int = Int(1.)
+    t_offset: Float = Float(0)
+    x_offset: Float = Float(0)
+    y_offset: Float = Float(0)
+
+def make_array_offsets(sim: ShowerSimulation) -> ArrayOffsetsData:
+    '''This function extracts the time offset from a CHASM sim for 
+    use in the ArrayOffsets datablock.
+    '''
+    pass
 
 @dataclass
 class LongitudinalData:
