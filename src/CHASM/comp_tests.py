@@ -30,13 +30,13 @@ sim.run()
 
 b = ch.eventio_bytes(sim)
 
-count = 0
-for i in range(4168+4,4924,4):
-    count += 1
-    print(struct.unpack('<f',bb[i:i+4]), count)
+# count = 0
+# for i in range(4168+4,4924,4):
+#     count += 1
+#     print(struct.unpack('<f',bb[i:i+4]), count)
 
-count = 0
-bb1 = bytes(b)
-for i in range(21,len(b),4):
-    count += 1
-    print(struct.unpack('<f',bb1[i:i+4]), count)
+# count = 0
+# bb1 = bytes(b)
+# for i in range(21,len(b),4):
+#     count += 1
+#     print(struct.unpack('<f',bb1[i:i+4]), count)

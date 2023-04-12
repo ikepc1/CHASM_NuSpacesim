@@ -197,12 +197,112 @@ class EventHeaderData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     eventio event header block.
     '''
+    evth: Float = Float(struct.unpack('f',b'EVTH')[0])
+    evno: Float = Float(1.)
+    p_id: Float = Float(1.)
+    total_energy: Float = Float(1.e8)
+    starting_altitude: Float = Float(120.e6)
+    first_target_id: Float = Float(1.)
+    first_interaction_height: Float = Float(120.e6)
+    momentum_x: Float = Float(1.)
+    momentum_y: Float = Float(1.)
+    momentum_minus_z: Float = Float(1.)
+    zenith: Float = Float(0.)
+    azimuth: Float = Float(0.)
+    n_random_sequences: Float = Float(1.)
+    random_seeds: list[Float] = field(default_factory= lambda: [Float(1.)] * 30)
+    run_number: Float = Float(1.)
+    date: Float = field(default_factory=date_to_float) #Date as float YYMMDD.
+    version: Float = Float(7.741) #mock CORSIKA version
+    n_observation_levels: Float = Float(1)
+    obs_levels: list[Float] = field(default_factory= lambda: [Float(0.)] * 10) #observation levels
+    e_slope: Float = Float(-1.) #-1.
+    e_low: Float = Float(1.e8) #Lower limit of energy range (primary)
+    e_high: Float = Float(1.e8) #Upper limit of energy range (primary)
+    energy_cutoff_hadrons: Float = Float(0.)
+    energy_cutoff_muons: Float = Float(0.)
+    energy_cutoff_electrons: Float = Float(0.)
+    energy_cutoff_photons: Float = Float(0.)
+    nflain: Float = Float(0.)
+    nfdif: Float = Float(0.)
+    nfdif: Float = Float(0.)
+    nflpi0: Float = Float(0.)
+    nflpif: Float = Float(0.)
+    nflche: Float = Float(0.)
+    nfragm: Float = Float(0.)
+    earth_magnetic_field_x: Float = Float(0.)
+    earth_magnetic_field_z: Float = Float(0.)
+    egs4_flag: Float = Float(0.)
+    nkg_flag: Float = Float(0.)
+    low_energy_hadron_model: Float = Float(0.)
+    high_energy_hadron_model: Float = Float(0.)
+    cerenkov_flag: Float = Float(0.)
+    neutrino_flag: Float = Float(0.)
+    curved_flag: Float = Float(0.)
+    theta_min: Float = Float(0.)
+    theta_max: Float = Float(0.)
+    phi_min: Float = Float(0.)
+    phi_max: Float = Float(0.)
+    cherenkov_bunch_size: Float = Float(1.)
+    n_cherenkov_detectors_x: Float = Float(1.)
+    n_cherenkov_detectors_y: Float = Float(1.)
+    cherenkov_detector_grid_spacing_x: Float = Float(1.)
+    cherenkov_detector_grid_spacing_y: Float = Float(1.)
+    cherenkov_detector_length_x: Float = Float(1.)
+    cherenkov_detector_length_y: Float = Float(1.)
+    cherenkov_output_flag: Float = Float(1.)
+    angle_array_x_magnetic_north: Float = Float(1.)
+    additional_muon_information_flag: Float = Float(1.)
+    egs4_multpliple_scattering_step_length_factor: Float = Float(1.)
+    cherenkov_wavelength_min: Float = Float(200.)
+    cherenkov_wavelength_max: Float = Float(900.)
+    n_reuse: Float = Float(0.)
+    reuse_x: list[Float] = field(default_factory= lambda: [Float(0.)] * 20)
+    reuse_y: list[Float] = field(default_factory= lambda: [Float(0.)] * 20)
+    sybill_interaction_flag: Float = Float(0.)
+    sybill_cross_section_flag: Float = Float(0.)
+    qgsjet_interaction_flag: Float = Float(0.)
+    qgsjet_cross_section_flag: Float = Float(0.)
+    dpmjet_interaction_flag: Float = Float(0.)
+    dpmjet_cross_section_flag: Float = Float(0.)
+    venus_nexus_epos_cross_section_flag: Float = Float(0.)
+    muon_multiple_scattering_flag: Float = Float(0.)
+    nkg_radial_distribution_range: Float = Float(0.)
+    energy_fraction_if_thinning_level_hadronic: Float = Float(0.)
+    energy_fraction_if_thinning_level_em: Float = Float(0.)
+    actual_weight_limit_thinning_hadronic: Float = Float(0.)
+    actual_weight_limit_thinning_em: Float = Float(0.)
+    max_radius_radial_thinning_cutting: Float = Float(0.)
+    viewcone_inner_angle: Float = Float(0.)
+    viewcone_outer_angle: Float = Float(0.)
+    transition_energy_low_high_energy_model: Float = Float(0.)
+    later_versions_placeholders: list[Float] = field(default_factory= lambda: [Float(0.)] * 119)
+
+def make_event_header(sim: ShowerSimulation) -> EventHeaderData:
+    '''This function makes an event header container for a CHASM
+    simulation.
+    '''
+    return EventHeaderData(
+        zenith = Float(sim.axis.zenith),
+        azimuth = Float(sim.axis.azimuth),
+        obs_levels = [Float(sim.counters.vectors[:,2].min())] * 10
+    )
 
 @dataclass
 class ArrayOffsetsData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     array offsets block.
     '''
+    n_offsets: Int = Int(1.)
+    t_offset: Float = Float(0)
+    x_offset: Float = Float(0)
+    y_offset: Float = Float(0)
+
+def make_array_offsets(sim: ShowerSimulation) -> ArrayOffsetsData:
+    '''This function extracts the time offset from a CHASM sim for 
+    use in the ArrayOffsets datablock.
+    '''
+    pass
 
 @dataclass
 class LongitudinalData:
