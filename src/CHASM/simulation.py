@@ -258,7 +258,7 @@ class ShowerSimulation:
     def counters(self, counters: Counters) -> None:
         self._counters = counters
 
-    def run(self, mesh: bool = False):
+    def run(self, mesh: bool = False, att: bool = False):
         '''This is the proprietary run method which creates the arrays of
         Signal, Timing, and Attenuation objects
         '''
@@ -269,7 +269,8 @@ class ShowerSimulation:
         self.y = self.ingredients['yield']
         self.axis = self.ingredients['axis']
         if mesh:
-            self.signals = np.empty(len(self.lX_intervals), dtype = 'O')
+            self.N_lX = len(self.lX_intervals)
+            self.signals = np.empty(self.N_lX, dtype = 'O')
             self.times = np.empty_like(self.signals)
             self.attenuations = np.empty_like(self.signals)
             for i, interval in enumerate(self.lX_intervals):
@@ -279,7 +280,9 @@ class ShowerSimulation:
                 self.times[i] = meshaxis.get_timing(self.counters)
                 self.attenuations[i] = meshaxis.get_attenuation(self.counters,self.y)
                 self.N_axis_points = meshaxis.r.size
+                self.N_points_at_X = meshaxis.config.N_IN_RING * self.N_lX
         else:
+            self.N_lX = 1
             self.signals = np.empty(1, dtype = 'O')
             self.times = np.empty(1, dtype = 'O')
             self.attenuations = np.empty(1, dtype = 'O')
@@ -287,9 +290,11 @@ class ShowerSimulation:
             self.times[0] = self.axis.get_timing(self.counters)
             self.attenuations[0] = self.axis.get_attenuation(self.counters,self.y)
             self.N_axis_points = self.axis.r.size
-        self.N_lX = self.signals.size
+            self.N_points_at_X = 1
         self.N_c = self.counters.N_counters
         self.N_bunches = self.N_lX * self.N_axis_points
+        self.signal_photons = self.get_signal_photons(att)
+        self.signal_times = self.get_signal_times()
         self._has_run = True
 
     def get_photons_array(self, i=0):
@@ -382,6 +387,17 @@ class ShowerSimulation:
                 photons_array[:,i_s:i_s+self.N_axis_points] = self.get_photons(i=i_a)
             i_s += self.N_axis_points
         return photons_array
+
+    def total_ng_at_X(self) -> np.ndarray:
+        '''This method returns the total number of photons going to each detector
+        from each step in grammage.
+        '''
+        ng = np.empty_like(self.axis.X)
+        iX = 0
+        for i in range(ng.size):
+            ng[i] = self.signal_photons[:,iX:iX+self.N_points_at_X].sum()
+            iX += self.N_points_at_X
+        return ng
 
     def get_signal_times(self) -> np.ndarray:
         '''This method takes the arrival times of photon bunches from each step

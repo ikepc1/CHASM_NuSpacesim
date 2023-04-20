@@ -6,5 +6,6 @@ from .atmosphere import Atmosphere, USStandardAtmosphere, CorsikaAtmosphere
 class AxisConfig:
     '''This is the container for axis config parameters'''
     N_POINTS: int = 500
+    N_IN_RING: int = 20
     ATM: Atmosphere = CorsikaAtmosphere()
     # ATM: Atmosphere = USStandardAtmosphere()

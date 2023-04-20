@@ -80,7 +80,8 @@ def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
     # 'AtmosphericProfile': AtmosphericProfileData(),
     }
     # block_dict['TelescopeDefinition'] = make_tel_def(sim)
-    block_dict['EventHeader'] = make_event_header(sim)
+    # block_dict['EventHeader'] = make_event_header(sim)
+    block_dict['Longitudinal'] = make_longitudinal(sim)
     return block_dict
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:

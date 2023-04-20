@@ -78,3 +78,14 @@ class Double:
 
     def to_bytes(self) -> bytes:
         return struct.pack('<d', self.value)
+
+@dataclass(frozen=True)
+class Short:
+    ''''This is the implementation of a double precision float in the 
+    eventio bytestream.
+    '''
+    value: int
+
+    def to_bytes(self) -> bytes:
+        return struct.pack('<h', self.value)
+

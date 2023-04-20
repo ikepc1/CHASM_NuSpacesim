@@ -3,7 +3,7 @@ from datetime import datetime
 import struct
 import numpy as np
 
-from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring
+from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short
 from .config import AxisConfig
 from .simulation import ShowerSimulation
 from .axis import Axis, Counters
@@ -309,6 +309,25 @@ class LongitudinalData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     longitudinal block.
     '''
+    event_id: Int = Int(1)
+    type: Int = Int(1)
+    np: Short = Short(2) #CHASM only deals in charged particles and cherenkov photons (2 dists)
+    nthick: Short = Short(1000)
+    thickstep: Float = Float(1)
+    nch: list[Float] = field(default_factory= lambda: [Float(0.)] * 1000)
+    ng: list[Float] = field(default_factory= lambda: [Float(0.)] * 1000)
+
+def make_longitudinal(sim: ShowerSimulation) -> LongitudinalData:
+    '''This function extracts the shower profile and total Cherenkov to include in the
+    mock longitudinal data block.
+    '''
+    X = sim.axis.X
+    N_thick = int(np.floor(X.max()))
+    Xs = np.arange(N_thick)
+    N_ch = [Float(val) for val in sim.shower.profile(Xs)]
+    ng_1g = np.interp(Xs,X[::-1],sim.total_ng_at_X()[::-1]).tolist()
+    n_g = [Float(val) for val in ng_1g]
+    return LongitudinalData(nthick=Short(N_thick), nch=N_ch, ng=n_g)
 
 @dataclass
 class TelescopeData:

@@ -494,12 +494,16 @@ class MeshAxis(Axis):
         self.lX_interval = lX_interval
         self.lX = np.mean(lX_interval)
         self.linear_axis = linear_axis
+        self.config = linear_axis.config
         self.atm = linear_axis.atm
         self.zenith = linear_axis.zenith
         self.azimuth = linear_axis.azimuth
         self.ground_level = linear_axis.ground_level
         self.shower = shower
-        mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.lX, self.linear_axis, self.shower)
+        mesh, self.nch, self._t, self._d, self._dr, self._a  = axis_to_mesh(self.lX, 
+                                                                            self.linear_axis, 
+                                                                            self.shower,
+                                                                            N_ring=self.config.N_IN_RING)
         self.rotated_mesh = rotate_mesh(mesh, linear_axis.zenith, linear_axis.azimuth)
 
     @property
@@ -552,7 +556,7 @@ class MeshAxis(Axis):
 
     def distance(self, X: np.ndarray):
         '''This method is the distance along the axis as a function of depth'''
-        return self.axis.distance
+        return self.linear_axis.distance(X)
 
     def theta(self, axis_vectors, counters: Counters):
         '''This method computes the ACUTE angles between the shower axis and the
