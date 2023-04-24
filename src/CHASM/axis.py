@@ -1178,6 +1178,7 @@ class DownwardAttenuation(Attenuation):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
+        self.atm = self.axis.atm
 
     def log_fraction_passed(self) -> np.ndarray:
         '''This method returns the natural log of the fraction of light
@@ -1204,6 +1205,7 @@ class DownwardAttenuationCurved(Attenuation):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
+        self.atm = self.axis.atm
 
     def log_fraction_passed(self):
         '''This method returns the natural log of the fraction of light
@@ -1229,6 +1231,7 @@ class UpwardAttenuation(Attenuation):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
+        self.atm = self.axis.atm
 
     def log_fraction_passed(self) -> np.ndarray:
         '''This method returns the fraction of light passed at each step from
@@ -1254,6 +1257,7 @@ class UpwardAttenuationCurved(Attenuation):
         self.axis = axis
         self.counters = counters
         self.yield_array = yield_array
+        self.atm = self.axis.atm
 
     def log_fraction_passed(self):
         '''This method returns the natural log of the fraction of light
