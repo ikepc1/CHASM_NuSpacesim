@@ -115,6 +115,7 @@ class Signal:
         self.counters = counters
         self.yield_array = yield_array
         self.t = self.shower.stage(self.axis.X)
+        self.t[self.t>14.] = 14.
         self.Nch = self.shower.profile(self.axis.X)
         self.theta = self.axis.theta(axis.vectors, counters)
         self.omega = self.counters.omega(self.axis.vectors)
