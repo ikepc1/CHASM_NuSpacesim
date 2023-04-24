@@ -23,44 +23,44 @@ To install from source:
 CHASM has implementations of both upward and downward going shower axes in either flat planar or curved atmospheres. A shower profile can be defined either by Gaisser-Hillas parameters, or as an array of particle counts and at a corresponding array of depths. Cherenkov yield distributions can be sampled along the shower axis, or in a mesh of points surrounding the axis, at which charged particles are distributed according to the NKG lateral distribution. The first step is to create a simulation.
 
 ```
-from CHASM.simulation import *
+import CHASM as ch
 
-sim = ShowerSimulation()
+sim = ch.ShowerSimulation()
 ```
 
 Then add an axis. The origin of the coordinate system is where the axis meets the ground. It is defined by a polar angle, azimuthal angle, and keyword arguments for the ground level and whether to account for atmospheric curvature.
 ```
-sim.add(DownwardAxis(theta, phi, ground_level = 0., curved = False))
+sim.add(ch.DownwardAxis(theta, phi, ground_level = 0., curved = False))
 ```
 or
 ```
-sim.add(UpwardAxis(theta, phi, ground_level = 0., curved = False))
+sim.add(ch.UpwardAxis(theta, phi, ground_level = 0., curved = False))
 ```
 
 Then add a shower.
 
 ```
-sim.add(GHShower(X_max, N_max, X0, Lambda))
+sim.add(ch.GHShower(X_max, N_max, X0, Lambda))
 ```
 or
 ```
-sim.add(UserShower(X, N))
+sim.add(ch.UserShower(X, N))
 ```
 
 Now we add photon counters. Both spherical CORSIKA IACT style counters and flat counting apertures are available.
 
 ```
-sim.add(SphericalCounters(counter_vectors, counter_radius))
+sim.add(ch.SphericalCounters(counter_vectors, counter_radius))
 ```
 or
 ```
-sim.add(FlatCounters(counter_vectors, counter_radius))
+sim.add(ch.FlatCounters(counter_vectors, counter_radius))
 ```
 
 Finally, we define the Cherenkov wavelength interval of interest.
 
 ```
-sim.add(Yield(min_l, max_l, N_bins = 1))
+sim.add(ch.Yield(min_l, max_l, N_bins = 1))
 ```
 
 We can now run the simulation, and generate signals.
