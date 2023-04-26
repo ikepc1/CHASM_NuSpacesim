@@ -1,6 +1,7 @@
 from typing import Protocol
 import eventio
 import numpy as np
+from dataclasses import dataclass
 
 from .shower import Shower
 from .axis import Axis, Counters, MeshAxis, MeshShower
@@ -189,12 +190,33 @@ class Element(Protocol):
     def create(self) -> object:
         ...
 
+@dataclass
+class PhotonBunch:
+    '''This is a data container for an iact style photon bunch.
+    '''
+    x: float
+    y: float
+    cx: float
+    cy: float
+    time: float
+    zem: float
+    photons: float
+    wavelength: float
+
+@dataclass
+class ShowerSignal:
+    '''This is a data container for a shower simulation's Cherenkov 
+    Photons, arrival times and counting locations.
+    '''
+    counters: np.ndarray #vectors to telescope positions shape = (3,N_counters)
+    X: np.ndarray #axis depths shape = (N_depth_steps)
+    wavelengths: np.ndarray #wavelength of each bin, shape = (N_wavelengths)
+    n_photons: np.ndarray #number of photons from each step to each counter shape = (N_counters, N_wavelengths, N_depth steps)
+
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
-    # lXs = np.arange(-4,1)
     lXs = np.linspace(-6,1,15)
     lX_intervals = list(zip(lXs[:-1], lXs[1:]))
-    # lXs = np.linspace(-4,1,5)
 
     def __init__(self):
         self.ingredients = {
