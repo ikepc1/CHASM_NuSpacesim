@@ -126,27 +126,6 @@ class Signal:
     def __repr__(self):
         return f"Signal({self.shower.__repr__()}, {self.axis.__repr__()}, {self.counters.__repr__()})"
 
-    # def calculate_gg(self):
-    #     '''This funtion returns the interpolated values of gg at a given deltas
-    #     and thetas
-
-    #     returns:
-    #     the angular distribution values at the desired thetas
-    #     The returned array is of size:
-    #     (# of counters, # of axis points)
-    #     '''
-    #     gg = np.empty_like(self.theta)
-    #     for i in range(gg.shape[1]):
-    #         gg_td = self.gga.angular_distribution(self.t[i], self.axis.delta[i])
-    #         gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
-    #     return gg
-    
-    @property
-    def photon_array_shape(self) -> tuple:
-        '''This property is the shape of the outputted photons array.
-        '''
-        return (self.counters.N_counters,len(self.yield_array),self.axis.r.size)
-
     def calculate_gg(self):
         '''This funtion returns the interpolated values of gg at a given deltas
         and thetas
@@ -157,9 +136,30 @@ class Signal:
         (# of counters, # of axis points)
         '''
         gg = np.empty_like(self.theta)
-        for i in range(gg.shape[0]):
-            gg[i] = self.gga.gg_of_t_delta_theta(self.t,self.axis.delta,self.theta[i])
+        for i in range(gg.shape[1]):
+            gg_td = self.gga.angular_distribution(self.t[i], self.axis.delta[i])
+            gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
         return gg
+    
+    @property
+    def photon_array_shape(self) -> tuple:
+        '''This property is the shape of the outputted photons array.
+        '''
+        return (self.counters.N_counters,len(self.yield_array),self.axis.r.size)
+
+    # def calculate_gg(self):
+    #     '''This funtion returns the interpolated values of gg at a given deltas
+    #     and thetas
+
+    #     returns:
+    #     the angular distribution values at the desired thetas
+    #     The returned array is of size:
+    #     (# of counters, # of axis points)
+    #     '''
+    #     gg = np.empty_like(self.theta)
+    #     for i in range(gg.shape[0]):
+    #         gg[i] = self.gga.gg_of_t_delta_theta(self.t,self.axis.delta,self.theta[i])
+    #     return gg
 
     def calculate_yield(self, y: MakeYield):
         ''' This function returns the total number of Cherenkov photons emitted
