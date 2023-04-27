@@ -100,10 +100,10 @@ class Yield:
         bin_edges = np.linspace(self.l_min, self.l_max, self.N_bins+1)
         return bin_edges[:-1], bin_edges[1:]
 
-    def create(self):
+    def create(self) -> list[MakeYield]:
         '''This method returns an instantiated yield object'''
         bin_minimums, bin_maximums = self.make_lambda_bins()
-        yield_array = np.empty_like(bin_minimums, dtype = 'O')
+        yield_array = []
         for i, (min, max) in enumerate(zip(bin_minimums, bin_maximums)):
-            yield_array[i] = MakeYield(min, max)
+            yield_array.append(MakeYield(min, max))
         return yield_array

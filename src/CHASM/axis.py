@@ -495,7 +495,7 @@ class Axis(ABC):
         the axis implementation.'''
         return self.get_timing_class()(self, counters)
 
-    def get_attenuation(self, counters: Counters, y: MakeYield) -> Attenuation:
+    def get_attenuation(self, counters: Counters, y: list[MakeYield]) -> Attenuation:
         '''This function returns an instantiated attenuation object appropriate for
         the axis implementation.'''
         return self.get_attenuation_class()(self, counters, y)
