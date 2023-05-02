@@ -229,10 +229,13 @@ class ShowerSignal:
     Photons, arrival times and counting locations.
     '''
     counters: np.ndarray #vectors to counters
-    axis: np.ndarray #vectors to axis points
+    source_points: np.ndarray #vectors to axis points
     wavelengths: np.ndarray #wavelength of each bin, shape = (N_wavelengths)
-    photons: np.ndarray #number of photons from each step to each counter, shape = (N_counters, N_wavelengths, N_depth_steps)
-    times: np.ndarray #arrival times of photons from each step to each counter, shape = (N_counters, N_depth_steps)
+    photons: np.ndarray #number of photons from each step to each counter, shape = (N_counters, N_wavelengths, N_axis_points)
+    times: np.ndarray #arrival times of photons from each step to each counter, shape = (N_counters, N_axis_points)
+    charged_particles: np.ndarray
+    depths: np.ndarray
+    total_photons: np.ndarray
 
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
@@ -246,23 +249,23 @@ class ShowerSimulation:
         'counters': None,
         'yield': None
         }
-        self._has_run = False
 
     def add(self, element: Element):
         '''Add a element to the list of elements for the sim to perform'''
         self.ingredients[element.element_type] = element.create()
+        if self.has_all_elements():
+            self.set_sim()
 
     def remove(self, type):
         '''Remove all ingredients of a certain type from simulation'''
         self.ingredients[type] = None
 
-    def check_ingredients(self) -> bool:
+    def has_all_elements(self) -> bool:
         '''This method checks to see if the simulation has the neccesary
         elements to generate a Cherenkov signal.
         '''
         for element_type in self.ingredients:
-            if type(self.ingredients[element_type]) == None:
-                print(f"Simulation needs {element_type}")
+            if self.ingredients[element_type] == None:
                 return False
         return True
 
@@ -302,6 +305,16 @@ class ShowerSimulation:
     def counters(self, counters: Counters) -> None:
         self._counters = counters
 
+    def set_sim(self) -> None:
+        '''This method sets the attributes of the sim.
+        '''
+        self.shower = self.ingredients['shower']
+        self.counters = self.ingredients['counters']
+        self.y = self.ingredients['yield']
+        self.axis = self.ingredients['axis']
+        self.axis.reset_for_profile(self.shower)
+        self.N_c = self.counters.N_counters
+
     @property
     def N_bunches_mesh(self) -> int:
         '''This property is the total number of Cherenkov photon sample points
@@ -331,37 +344,48 @@ class ShowerSimulation:
         using mesh sampling.
         '''
         N_axis_points = self.axis.config.N_IN_RING * self.axis.r.size
-        axis_vectors = np.empty((self.N_bunches_mesh, 3))
-        photons_array = np.empty((self.N_c, len(self.y), self.N_bunches_mesh))
-        times_array = np.empty((self.N_c, self.N_bunches_mesh))
-        i_s = 0
-        for lX in self.lX_intervals:
+        axis_vectors = np.empty((len(self.lX_intervals), N_axis_points, 3))
+        photons_array = np.empty((self.N_c, len(self.y), len(self.lX_intervals), N_axis_points))
+        times_array = np.empty((self.N_c, len(self.lX_intervals), N_axis_points))
+
+        #calculate signal at each mesh ring
+        for i, lX in enumerate(self.lX_intervals):
             meshaxis = MeshAxis(lX, self.axis, self.shower)
             meshshower = MeshShower(meshaxis)
             signal = Signal(meshshower,meshaxis,self.counters,self.y)
 
-            axis_vectors[i_s:i_s+N_axis_points,:] = meshaxis.vectors
+            axis_vectors[i,:] = meshaxis.vectors
 
             if att:
-                photons_array[:,:,i_s:i_s+N_axis_points] = self.get_attenuated_photons_array(signal)
+                photons_array[:,:,i] = self.get_attenuated_photons_array(signal)
             else:
-                photons_array[:,:,i_s:i_s+N_axis_points] = signal.calculate_ng()
+                photons_array[:,:,i] = signal.calculate_ng()
 
-            times_array[:,i_s:i_s+N_axis_points] = meshaxis.get_timing(self.counters).counter_time()
+            times_array[:,i] = meshaxis.get_timing(self.counters).counter_time()
+        
+        #sum photons at each depth step
+        tot_at_X = photons_array.sum(axis=2).sum(axis=1).sum(axis=0).reshape(self.axis.r.size,-1).sum(axis=1)
 
-            i_s += N_axis_points
-    
+        #flatten over mesh rings
+        photons_array = photons_array.reshape((photons_array.shape[0],photons_array.shape[1],-1))
+        times_array = times_array.reshape((times_array.shape[0],-1))
+        axis_vectors = axis_vectors.reshape((-1,3))    
+        
         return ShowerSignal(self.counters.vectors, 
                             axis_vectors, 
                             np.array([y.l_mid for y in self.y]),
                             photons_array,
-                            times_array)
+                            times_array,
+                            self.shower.profile(self.axis.X),
+                            self.axis.X,
+                            tot_at_X)
 
     def get_signal(self, att: bool) -> ShowerSignal:
         '''This method returns a ShowerSignal object with the photons calculated
         along the axis.
         '''
         signal = Signal(self.shower,self.axis,self.counters,self.y)
+
         if att:
             photons_array = self.get_attenuated_photons_array(signal)
         else:
@@ -371,21 +395,18 @@ class ShowerSimulation:
                             self.axis.vectors, 
                             np.array([y.l_mid for y in self.y]),
                             photons_array,
-                            times_array)
+                            times_array,
+                            self.shower.profile(self.axis.X),
+                            self.axis.X,
+                            photons_array.sum(axis=1).sum(axis=0))
 
     def run(self, mesh: bool = False, att: bool = False) -> ShowerSignal:
         '''This method calculates the Cherenkov signal of a shower, and 
         stores it in a ShowerSignal object.
         '''
-        if not self.check_ingredients():
+        if not self.has_all_elements():
+            print('Sim needs a shower, counters, axis, and yield.')
             return None
-        
-        self.shower = self.ingredients['shower']
-        self.counters = self.ingredients['counters']
-        self.y = self.ingredients['yield']
-        self.axis = self.ingredients['axis']
-        self.axis.reset_for_profile(self.shower)
-        self.N_c = self.counters.N_counters
 
         if mesh:
             return(self.get_mesh_signal(att))

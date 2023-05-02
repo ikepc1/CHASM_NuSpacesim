@@ -351,7 +351,7 @@ class Axis(ABC):
         occurs on the axis. We dont need to run universality calculations where
         there's no shower.
         '''
-        ids = shower.profile(self.X) > self.config.MIN_CHARGED_PARTICLES
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
         self.altitude = self.altitude[ids]
 
     @property
