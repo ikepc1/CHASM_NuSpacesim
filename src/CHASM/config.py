@@ -6,8 +6,9 @@ from .atmosphere import Atmosphere, USStandardAtmosphere, CorsikaAtmosphere
 class AxisConfig:
     '''This is the container for axis config parameters.
     '''
-    N_POINTS: int = 500
-    N_IN_RING: int = 20
+    N_POINTS: int = 1000
+    N_IN_RING: int = 15
+    MIN_CHARGED_PARTICLES: float = 5.e4 #number of charged particles for a step to be considered in cherenkov calcs
     ATM: Atmosphere = CorsikaAtmosphere()
     # ATM: Atmosphere = USStandardAtmosphere()
   

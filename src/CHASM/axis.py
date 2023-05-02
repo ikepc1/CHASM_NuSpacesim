@@ -344,6 +344,15 @@ class Axis(ABC):
         self.ground_level = params.ground_level
         self.zenith = params.zenith
         self.azimuth = params.azimuth
+        self.altitude = self.set_initial_altitude()
+
+    def reset_for_profile(self, shower: Shower) -> None:
+        '''This method resets the attributes of the class based on where the shower
+        occurs on the axis. We dont need to run universality calculations where
+        there's no shower.
+        '''
+        ids = shower.profile(self.X) > self.config.MIN_CHARGED_PARTICLES
+        self.altitude = self.altitude[ids]
 
     @property
     def zenith(self) -> float:
@@ -385,8 +394,7 @@ class Axis(ABC):
             raise ValueError('Ground level too high')
         self._ground_level = value
 
-    @property
-    def altitude(self) -> np.ndarray:
+    def set_initial_altitude(self) -> np.ndarray:
         '''altitude property definition'''
         return np.linspace(self.ground_level, self.atm.maximum_height, self.config.N_POINTS)
 

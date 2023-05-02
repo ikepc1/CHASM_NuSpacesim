@@ -384,6 +384,7 @@ class ShowerSimulation:
         self.counters = self.ingredients['counters']
         self.y = self.ingredients['yield']
         self.axis = self.ingredients['axis']
+        self.axis.reset_for_profile(self.shower)
         self.N_c = self.counters.N_counters
 
         if mesh:
