@@ -2,7 +2,7 @@ import eventio
 import struct
 import CHASM as ch
 
-testfile = "/home/isaac/CHASM_NuSpacesim/demo/IACT_shower_noatt.dat"
+testfile = "../../demo/IACT_shower_noatt.dat"
 
 ei = eventio.IACTFile(testfile)
 ei._next_header_pos = 0
@@ -26,7 +26,7 @@ sim.add(ch.SphericalCounters(cors_no_att.counter_vectors, cors_no_att.counter_ra
 #Add wavelength interval for Cherenkov yield calculation
 sim.add(ch.Yield(cors_no_att.min_l, cors_no_att.max_l,1))
 
-sim.run()
+# sig = sim.run()
 
 b = ch.eventio_bytes(sim)
 

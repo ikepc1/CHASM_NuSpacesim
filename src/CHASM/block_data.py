@@ -5,7 +5,7 @@ import numpy as np
 
 from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short
 from .config import AxisConfig
-from .simulation import ShowerSimulation
+from .simulation import ShowerSimulation, ShowerSignal, PhotonBunch
 from .axis import Axis, Counters
 from .shower import Shower
 from .generate_Cherenkov import MakeYield
@@ -317,16 +317,23 @@ class LongitudinalData:
     nch: list[Float] = field(default_factory= lambda: [Float(0.)] * 1000)
     ng: list[Float] = field(default_factory= lambda: [Float(0.)] * 1000)
 
-def make_longitudinal(sim: ShowerSimulation) -> LongitudinalData:
+def make_longitudinal(sig: ShowerSignal) -> LongitudinalData:
     '''This function extracts the shower profile and total Cherenkov to include in the
     mock longitudinal data block.
     '''
-    X = sim.axis.X
+    X = sig.depths
     N_thick = int(np.floor(X.max()))
     Xs = np.arange(N_thick)
-    N_ch = [Float(val) for val in sim.shower.profile(Xs)]
-    ng_1g = np.interp(Xs,X[::-1],sim.total_ng_at_X()[::-1]).tolist()
+    N_ch = [Float(val) for val in sig.charged_particles]
+
+    #depending on upward vs downward axis, the depths will increasing or decreasing
+    #respectively. Numpy interp needs strictly increasing x values.
+    if np.all(np.diff(X) > 0.):
+        ng_1g = np.interp(Xs,X,sig.total_photons).tolist()
+    else:
+        ng_1g = np.interp(Xs,X[::-1],sig.total_photons[::-1]).tolist()
     n_g = [Float(val) for val in ng_1g]
+
     return LongitudinalData(nthick=Short(N_thick), nch=N_ch, ng=n_g)
 
 @dataclass
@@ -334,6 +341,7 @@ class TelescopeData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     telescope events block.
     '''
+    bunches: list
 
 @dataclass
 class PhotonsData:

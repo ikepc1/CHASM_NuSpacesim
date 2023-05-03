@@ -1,5 +1,5 @@
 import numpy as np
-# from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields
 # from datetime import datetime
 # import struct
 
@@ -74,6 +74,7 @@ def block_to_bytes(block_data: dataclass) -> bytearray:
 def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
     '''This function instantiates the data block containers.
     '''
+    sig = sim.run()
     block_dict = {
     # 'RunHeader': RunHeaderData(),
     # 'InputCard': InputCardData(),
@@ -81,7 +82,7 @@ def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
     }
     # block_dict['TelescopeDefinition'] = make_tel_def(sim)
     # block_dict['EventHeader'] = make_event_header(sim)
-    block_dict['Longitudinal'] = make_longitudinal(sim)
+    block_dict['Longitudinal'] = make_longitudinal(sig)
     return block_dict
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:

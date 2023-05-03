@@ -223,12 +223,26 @@ class PhotonBunch:
     photons: float
     wavelength: float
 
+def x_y_cx_cy(source_points: np.ndarray, counters: Counters) -> tuple[np.ndarray]:
+    '''This function calculates the x and y directional cosines for paths from source points to 
+    Cherenkov counters.
+    '''
+    travel_vectors = counters.travel_vectors(source_points)
+    travel_r = counters.travel_length(source_points)
+    cx = travel_vectors[:,0] / travel_r
+    cy = travel_vectors[:,1] / travel_r
+    cz = travel_vectors[:,2] / travel_r
+    x = travel_vectors[:,0] + cx * travel_vectors[:,2] / cz - counters.vectors[:,0]
+    y = travel_vectors[:,1] + cy * travel_vectors[:,2] / cz - counters.vectors[:,1]
+    return x, y, cx, cy
+
 @dataclass
 class ShowerSignal:
     '''This is a data container for a shower simulation's Cherenkov 
     Photons, arrival times and counting locations.
     '''
-    counters: np.ndarray #vectors to counters
+    counters: Counters #counters object
+    axis: Axis #axis object
     source_points: np.ndarray #vectors to axis points
     wavelengths: np.ndarray #wavelength of each bin, shape = (N_wavelengths)
     photons: np.ndarray #number of photons from each step to each counter, shape = (N_counters, N_wavelengths, N_axis_points)
@@ -236,6 +250,16 @@ class ShowerSignal:
     charged_particles: np.ndarray
     depths: np.ndarray
     total_photons: np.ndarray
+
+    def get_bunches(self) -> np.ndarray[PhotonBunch]:
+        '''This method returns a list of photon bunches for the shower.
+        '''
+        x, y, cx, cy = x_y_cx_cy(self.source_points, self.counters)
+        bunches = np.empty_like(self.photons, dtype='O')
+        for counter_id in range(self.photons.shape[0]):
+            pass
+            # bunches[counter_id] = 
+        return bunches
 
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
@@ -371,7 +395,8 @@ class ShowerSimulation:
         times_array = times_array.reshape((times_array.shape[0],-1))
         axis_vectors = axis_vectors.reshape((-1,3))    
         
-        return ShowerSignal(self.counters.vectors, 
+        return ShowerSignal(self.counters, 
+                            self.axis,
                             axis_vectors, 
                             np.array([y.l_mid for y in self.y]),
                             photons_array,
@@ -391,7 +416,8 @@ class ShowerSimulation:
         else:
             photons_array = signal.calculate_ng()
         times_array = self.axis.get_timing(self.counters).counter_time()
-        return ShowerSignal(self.counters.vectors, 
+        return ShowerSignal(self.counters, 
+                            self.axis,
                             self.axis.vectors, 
                             np.array([y.l_mid for y in self.y]),
                             photons_array,
