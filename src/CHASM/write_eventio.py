@@ -35,9 +35,9 @@ IACT_OBJECTS = {
     'Longitudinal': LongitudinalData,
     'TelescopeData': TelescopeData,
     'Photons': PhotonsData,
-    'CameraLayout': CameraLayoutData,
-    'TriggerTime': TriggerTimeData,
-    'PhotoElectrons': PhotoElectrons,
+    # 'CameraLayout': CameraLayoutData,
+    # 'TriggerTime': TriggerTimeData,
+    # 'PhotoElectrons': PhotoElectrons,
     'EventEnd': EventEnd,
     'RunEnd': RunEnd,   
 }
@@ -76,13 +76,14 @@ def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
     '''
     sig = sim.run()
     block_dict = {
-    # 'RunHeader': RunHeaderData(),
-    # 'InputCard': InputCardData(),
-    # 'AtmosphericProfile': AtmosphericProfileData(),
+    'RunHeader': RunHeaderData(),
+    'InputCard': InputCardData(),
+    'AtmosphericProfile': AtmosphericProfileData(),
     }
-    # block_dict['TelescopeDefinition'] = make_tel_def(sim)
-    # block_dict['EventHeader'] = make_event_header(sim)
+    block_dict['TelescopeDefinition'] = make_tel_def(sim)
+    block_dict['EventHeader'] = make_event_header(sim)
     block_dict['Longitudinal'] = make_longitudinal(sig)
+    block_dict['TelescopeData'] = make_telescope_data(sig)
     return block_dict
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
@@ -97,12 +98,18 @@ def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
     length: int -> size of the data block in bytes
     returns: bytes -> the header bytes
     '''
-    # type_bytes = int_to_bytes(type)
-    # length_bytes = int_to_bytes(length)
-    # return SYNC_MARKER + type_bytes + b'\x00\x00\x00\x00' + length_bytes
-    return bytearray(
+    b = bytearray(
         SYNC_MARKER + Int(type).to_bytes()+ Int(id).to_bytes() + Int(length).to_bytes()
         )
+    
+    '''
+    If it's the TelescopeData block, the header needs to have the 'only sub-objects'
+    flag set in the length word. Setting the last byte to ascii @ seems to accomplish
+    this lol.
+    '''
+    if type == 1204:
+        b = b[:-1] + b'@'
+    return b
 
 class ImproperBlockSize(Exception):
     pass

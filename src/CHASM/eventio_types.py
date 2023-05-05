@@ -1,6 +1,6 @@
 import struct
 from typing import Protocol
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, field
 import numpy as np
 
 class EventioType(Protocol):
@@ -88,4 +88,29 @@ class Short:
 
     def to_bytes(self) -> bytes:
         return struct.pack('<h', self.value)
+    
+@dataclass
+class PhotonsData:
+    '''This class contains all the parameters needed to construct a mock CORSIKA
+    photon bunch block.
+    '''
+    type: Int = Int(1205)
+    id: Int = 0
+    length: Int = 0
+    arr: Short = 0
+    tel_no: Short = 0
+    n_photons: Double = 0.
+    n_bunches: Int = 0.
+    bunches: np.ndarray = field(default_factory= lambda: np.empty(0))
 
+    def to_bytes(self) -> bytes:
+        b = bytearray()
+        b.extend(self.type.to_bytes())
+        b.extend(self.id.to_bytes())
+        b.extend(self.length.to_bytes())
+        b.extend(self.arr.to_bytes())
+        b.extend(self.tel_no.to_bytes())
+        b.extend(self.n_photons.to_bytes())
+        b.extend(self.n_bunches.to_bytes())
+        b.extend(self.bunches.tobytes())
+        return b

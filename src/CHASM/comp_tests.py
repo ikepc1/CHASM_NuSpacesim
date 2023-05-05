@@ -24,7 +24,7 @@ sim.add(ch.UserShower(cors_no_att.X, cors_no_att.nch)) #profiles could also be c
 sim.add(ch.SphericalCounters(cors_no_att.counter_vectors, cors_no_att.counter_radius))
 
 #Add wavelength interval for Cherenkov yield calculation
-sim.add(ch.Yield(cors_no_att.min_l, cors_no_att.max_l,1))
+sim.add(ch.Yield(cors_no_att.min_l, cors_no_att.max_l,3))
 
 # sig = sim.run()
 

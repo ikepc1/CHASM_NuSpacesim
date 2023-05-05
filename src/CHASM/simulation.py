@@ -4,7 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from .shower import Shower
-from .axis import Axis, Counters, MeshAxis, MeshShower, Timing, Attenuation
+from .axis import Axis, Counters, MeshAxis, MeshShower, Timing, Attenuation, MakeSphericalCounters
 from .generate_Cherenkov import MakeYield
 from .cherenkov_photon_array import CherenkovPhotonArray
 
@@ -210,31 +210,22 @@ class Element(Protocol):
     def create(self) -> object:
         ...
 
-@dataclass
-class PhotonBunch:
-    '''This is a data container for an iact style photon bunch.
-    '''
-    x: float
-    y: float
-    cx: float
-    cy: float
-    time: float
-    zem: float
-    photons: float
-    wavelength: float
-
 def x_y_cx_cy(source_points: np.ndarray, counters: Counters) -> tuple[np.ndarray]:
     '''This function calculates the x and y directional cosines for paths from source points to 
     Cherenkov counters.
     '''
+    if not isinstance(counters, MakeSphericalCounters):
+        raise ValueError('Only spherical counters work when generating eventio format.')
     travel_vectors = counters.travel_vectors(source_points)
     travel_r = counters.travel_length(source_points)
-    cx = travel_vectors[:,0] / travel_r
-    cy = travel_vectors[:,1] / travel_r
-    cz = travel_vectors[:,2] / travel_r
-    x = travel_vectors[:,0] + cx * travel_vectors[:,2] / cz - counters.vectors[:,0]
-    y = travel_vectors[:,1] + cy * travel_vectors[:,2] / cz - counters.vectors[:,1]
-    return x, y, cx, cy
+    cx = -travel_vectors[:,:,0] / travel_r
+    cy = -travel_vectors[:,:,1] / travel_r
+    x = counters.input_radius * cx.T
+    y = counters.input_radius * cy.T
+    # cz = travel_vectors[:,:,2] / travel_r
+    # x = (travel_vectors[:,:,0] - cx * travel_vectors[:,:,2] / cz).T - counters.vectors[:,0]
+    # y = (travel_vectors[:,:,1] - cy * travel_vectors[:,:,2] / cz).T - counters.vectors[:,1]
+    return x.T, y.T, cx, cy #convert to cm
 
 @dataclass
 class ShowerSignal:
@@ -251,15 +242,28 @@ class ShowerSignal:
     depths: np.ndarray
     total_photons: np.ndarray
 
-    def get_bunches(self) -> np.ndarray[PhotonBunch]:
+    def __post_init__(self) -> None:
+        self.x, self.y, self.cx, self.cy = x_y_cx_cy(self.source_points, self.counters)
+
+    def get_bunches(self, tel_id: int) -> np.ndarray:
         '''This method returns a list of photon bunches for the shower.
+        Each has an x and y relative to the telescope, directional cosines
+        cx and cy for the incoming ray, arrival time, source height (zem),
+        number of photons in the bunch, and wavelength.
+        The returned array is of shape (N_axis_points*N_wavelengths,8)
         '''
-        x, y, cx, cy = x_y_cx_cy(self.source_points, self.counters)
-        bunches = np.empty_like(self.photons, dtype='O')
-        for counter_id in range(self.photons.shape[0]):
-            pass
-            # bunches[counter_id] = 
-        return bunches
+        photons = self.photons[tel_id]
+        bunches = np.empty((photons.shape[0], photons.shape[1], 8), dtype=float)
+        for i, l in enumerate(self.wavelengths):
+            bunches[i,:,0] = self.x[tel_id]
+            bunches[i,:,1] = self.y[tel_id]
+            bunches[i,:,2] = self.cx[tel_id]
+            bunches[i,:,3] = self.cy[tel_id]
+            bunches[i,:,4] = self.times[tel_id]
+            bunches[i,:,5] = self.source_points[:,2]
+            bunches[i,:,6] = photons[i,:]
+            bunches[i,:,7] = -l
+        return bunches.reshape((-1,8)).astype(np.float32)
 
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''

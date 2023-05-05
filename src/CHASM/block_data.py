@@ -3,9 +3,9 @@ from datetime import datetime
 import struct
 import numpy as np
 
-from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short
+from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short, PhotonsData
 from .config import AxisConfig
-from .simulation import ShowerSimulation, ShowerSignal, PhotonBunch
+from .simulation import ShowerSimulation, ShowerSignal
 from .axis import Axis, Counters
 from .shower import Shower
 from .generate_Cherenkov import MakeYield
@@ -94,6 +94,7 @@ class RunHeaderData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     header.
     '''
+    nwords: Int = Int(273)
     runh: Float = Float(struct.unpack('f',b'RUNH')[0])
     run_no: Float = Float(1.) #Run number
     date: Float = field(default_factory=date_to_float) #Date as float YYMMDD.
@@ -134,6 +135,7 @@ class InputCardData:
     '''This is a wrapper for the list of strings representing lines of 
     a CORSIKA steering file.
     '''
+    nstrings: Int = Int(1)
     lines: list[String] = field(default_factory= lambda: [String('Input Card Placeholder')])
 
 def atm_altitudes_km() -> list[Double]:
@@ -197,6 +199,7 @@ class EventHeaderData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     eventio event header block.
     '''
+    nwords: Int = Int(273)
     evth: Float = Float(struct.unpack('f',b'EVTH')[0])
     evno: Float = Float(1.)
     p_id: Float = Float(1.)
@@ -341,37 +344,30 @@ class TelescopeData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     telescope events block.
     '''
-    bunches: list
+    tel_data: list[PhotonsData]
 
-@dataclass
-class PhotonsData:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    photon bunch block.
+def make_telescope_data(sig: ShowerSignal) -> TelescopeData:
+    '''This function constructs a TelescopeData object from a shower signal
+    object.
     '''
-
-@dataclass
-class CameraLayoutData:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    camera layout block.
-    '''
-
-@dataclass
-class TriggerTimeData:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    trigger time block.
-    '''
-
-@dataclass
-class PhotoElectrons:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    photo electrons block.
-    '''
+    tel_data = []
+    for i in range(sig.counters.N_counters):
+        bunches = sig.get_bunches(i)
+        tel_data.append(PhotonsData(
+            length = Int(bunches.size*4), #4 bytes per float
+            tel_no = Short(i),
+            n_photons = Double(sig.photons[i].sum()),
+            n_bunches = Int(bunches.shape[0]),
+            bunches = bunches
+        ))
+    return TelescopeData(tel_data)
 
 @dataclass
 class EventEnd:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     event end block.
     '''
+    
 
 @dataclass
 class RunEnd:
@@ -379,16 +375,3 @@ class RunEnd:
     run end block.
     '''
 
-# def run_header_bytes() -> bytearray:
-#     bb = object_header_bytes(IACT_TYPES['RunHeader'], 1096)
-#     bb.extend(block_to_bytes(RunHeaderData()))
-#     return bb
-
-# def input_card_bytes(card_lines: list[str]) -> bytearray:
-#     '''This function returns the byte buffer representing the eventio input 
-#     card data block'''
-#     block = object_header_bytes(IACT_TYPES['InputCard'], len(block))
-#     block.extend(len(card_lines).to_bytes(4,'little'))
-#     for line in card_lines:
-#         block.extend(String(line).to_bytes)
-#     return block
