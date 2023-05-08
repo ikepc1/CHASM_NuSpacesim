@@ -1,5 +1,6 @@
 import numpy as np
 from dataclasses import dataclass, field, fields
+from pathlib import Path
 # from datetime import datetime
 # import struct
 
@@ -71,19 +72,21 @@ def block_to_bytes(block_data: dataclass) -> bytearray:
         append_EIType_to_buffer(byte_buffer, value)
     return byte_buffer
 
-def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
+def create_data_blocks(sig: ShowerSignal) -> dict[str, dataclass]:
     '''This function instantiates the data block containers.
     '''
-    sig = sim.run()
     block_dict = {
     'RunHeader': RunHeaderData(),
     'InputCard': InputCardData(),
     'AtmosphericProfile': AtmosphericProfileData(),
     }
-    block_dict['TelescopeDefinition'] = make_tel_def(sim)
-    block_dict['EventHeader'] = make_event_header(sim)
+    block_dict['TelescopeDefinition'] = make_tel_def(sig)
+    block_dict['EventHeader'] = make_event_header(sig)
+    block_dict['ArrayOffsets'] = make_array_offsets(sig)
     block_dict['Longitudinal'] = make_longitudinal(sig)
     block_dict['TelescopeData'] = make_telescope_data(sig)
+    block_dict['EventEnd'] = make_event_end(sig)
+    block_dict['RunEnd'] = RunEnd()
     return block_dict
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
@@ -124,3 +127,10 @@ def eventio_bytes(sim: ShowerSimulation) -> bytearray:
         byte_buffer.extend(object_header_bytes(IACT_TYPES[block_type], len(block_bytes)))
         byte_buffer.extend(block_bytes)
     return byte_buffer
+
+def write_ei_file(sig: ShowerSignal, filename: str) -> None:
+    '''This function writes the CHASM output to an eventio file format.
+    '''
+    Path(filename).touch()
+    with open(filename,'wb') as ei_file:
+        ei_file.write(eventio_bytes(sig))

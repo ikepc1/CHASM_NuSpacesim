@@ -183,16 +183,16 @@ class TelescopeDefinitionData:
     tel_z: list[Float]
     tel_r: list[Float]
 
-def make_tel_def(sim: ShowerSimulation) -> TelescopeDefinitionData:
+def make_tel_def(sig: ShowerSignal) -> TelescopeDefinitionData:
     '''This function returns an instantiated Telescope definition
      data block container.
     '''
-    vectors_cm = sim.counters.vectors * 100.
+    vectors_cm = sig.counters.vectors * 100.
     x = [Float(val) for val in vectors_cm[:,0].tolist()]
     y = [Float(val) for val in vectors_cm[:,1].tolist()]
     z = [Float(val) for val in vectors_cm[:,2].tolist()]
-    r = [Float(val) for val in np.full(sim.N_c,sim.counters.input_radius*100.).tolist()]
-    return TelescopeDefinitionData(Varint(sim.N_c),Float(0.),x,y,z,r)
+    r = [Float(val) for val in np.full(sig.counters.N_counters,sig.counters.input_radius*100.).tolist()]
+    return TelescopeDefinitionData(Varint(sig.counters.N_counters),Float(0.),x,y,z,r)
 
 @dataclass
 class EventHeaderData:
@@ -281,14 +281,14 @@ class EventHeaderData:
     transition_energy_low_high_energy_model: Float = Float(0.)
     later_versions_placeholders: list[Float] = field(default_factory= lambda: [Float(0.)] * 119)
 
-def make_event_header(sim: ShowerSimulation) -> EventHeaderData:
+def make_event_header(sig: ShowerSignal) -> EventHeaderData:
     '''This function makes an event header container for a CHASM
     simulation.
     '''
     return EventHeaderData(
-        zenith = Float(sim.axis.zenith),
-        azimuth = Float(sim.axis.azimuth),
-        obs_levels = [Float(sim.counters.vectors[:,2].min())] * 10
+        zenith = Float(sig.axis.zenith),
+        azimuth = Float(sig.axis.azimuth),
+        obs_levels = [Float(sig.counters.vectors[:,2].min())] * 10
     )
 
 @dataclass
@@ -301,11 +301,11 @@ class ArrayOffsetsData:
     x_offset: Float = Float(0)
     y_offset: Float = Float(0)
 
-def make_array_offsets(sim: ShowerSimulation) -> ArrayOffsetsData:
+def make_array_offsets(sig: ShowerSignal) -> ArrayOffsetsData:
     '''This function extracts the time offset from a CHASM sim for 
     use in the ArrayOffsets datablock.
     '''
-    pass
+    return ArrayOffsetsData()
 
 @dataclass
 class LongitudinalData:
@@ -367,11 +367,25 @@ class EventEnd:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     event end block.
     '''
+    nwords: Int = Int(273)
+    evte: Float = Float(struct.unpack('f',b'EVTE')[0])
+    evt_no: Float = Float(1.)
+    n_photons: Float = Float(0.)
+    n_electrons: Float = Float(0.)
+    empty_words: list[Float] = field(default_factory= lambda: [Float(0.)] * 269)
     
+def make_event_end(sig: ShowerSignal) -> EventEnd:
+    '''This finction makes an event end data block.
+    '''
+    return EventEnd(n_photons = Float(sig.total_photons.sum()),
+                    n_electrons = Float(sig.charged_particles.sum()))
 
 @dataclass
 class RunEnd:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     run end block.
     '''
-
+    nwords: Int = Int(3)
+    rune: Float = Float(struct.unpack('f',b'RUNE')[0])
+    run_no: Float = Float(1.)
+    n_events: Float = Float(1.)

@@ -26,10 +26,12 @@ sim.add(ch.SphericalCounters(cors_no_att.counter_vectors, cors_no_att.counter_ra
 #Add wavelength interval for Cherenkov yield calculation
 sim.add(ch.Yield(cors_no_att.min_l, cors_no_att.max_l,3))
 
-# sig = sim.run()
+sig = sim.run()
 
-b = ch.eventio_bytes(sim)
-
+# b = ch.eventio_bytes(sig)
+ch.write_ei_file(sig, 'test.dat')
+ei_test = eventio.IACTFile('test.dat')
+ei_test._next_header_pos = 0
 # count = 0
 # for i in range(4168+4,4924,4):
 #     count += 1
