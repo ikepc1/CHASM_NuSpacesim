@@ -95,12 +95,12 @@ class PhotonsData:
     photon bunch block.
     '''
     type: Int = Int(1205)
-    id: Int = 0
-    length: Int = 0
-    arr: Short = 0
-    tel_no: Short = 0
-    n_photons: Double = 0.
-    n_bunches: Int = 0.
+    id: Int = Int(0)
+    length: Int = Int(0)
+    arr: Short = Short(0)
+    tel_no: Short = Short(0)
+    n_photons: Float = Float(0.)
+    n_bunches: Int = Int(0)
     bunches: np.ndarray = field(default_factory= lambda: np.empty(0))
 
     def to_bytes(self) -> bytes:

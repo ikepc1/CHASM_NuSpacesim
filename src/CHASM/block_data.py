@@ -296,7 +296,7 @@ class ArrayOffsetsData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     array offsets block.
     '''
-    n_offsets: Int = Int(1.)
+    n_offsets: Int = Int(1)
     t_offset: Float = Float(0)
     x_offset: Float = Float(0)
     y_offset: Float = Float(0)
@@ -327,16 +327,17 @@ def make_longitudinal(sig: ShowerSignal) -> LongitudinalData:
     X = sig.depths
     N_thick = int(np.floor(X.max()))
     Xs = np.arange(N_thick)
-    N_ch = [Float(val) for val in sig.charged_particles]
 
     #depending on upward vs downward axis, the depths will increasing or decreasing
     #respectively. Numpy interp needs strictly increasing x values.
     if np.all(np.diff(X) > 0.):
+        nch_1g = np.interp(Xs,X,sig.charged_particles).tolist()
         ng_1g = np.interp(Xs,X,sig.total_photons).tolist()
     else:
+        nch_1g = np.interp(Xs,X[::-1],sig.charged_particles[::-1]).tolist()
         ng_1g = np.interp(Xs,X[::-1],sig.total_photons[::-1]).tolist()
     n_g = [Float(val) for val in ng_1g]
-
+    N_ch = [Float(val) for val in nch_1g]
     return LongitudinalData(nthick=Short(N_thick), nch=N_ch, ng=n_g)
 
 @dataclass
@@ -354,9 +355,10 @@ def make_telescope_data(sig: ShowerSignal) -> TelescopeData:
     for i in range(sig.counters.N_counters):
         bunches = sig.get_bunches(i)
         tel_data.append(PhotonsData(
-            length = Int(bunches.size*4), #4 bytes per float
+            id = Int(i),
+            length = Int(bunches.size*4 + 12), #4 bytes per float 12, in the header
             tel_no = Short(i),
-            n_photons = Double(sig.photons[i].sum()),
+            n_photons = Float(sig.photons[i].sum()),
             n_bunches = Int(bunches.shape[0]),
             bunches = bunches
         ))

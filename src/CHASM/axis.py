@@ -40,14 +40,19 @@ class Counters(ABC):
         return self._input_radius
 
     @input_radius.setter
-    def input_radius(self, input_value):
+    def input_radius(self, input_value: np.ndarray | float):
         '''This is the input counter radius setter.'''
         if type(input_value) != np.ndarray:
             input_value = np.array(input_value)
-        if np.size(input_value) == np.shape(self.vectors)[0] or np.size(input_value) == 1:
-            self._input_radius = input_value
+        # if np.size(input_value) == np.shape(self.vectors)[0] or np.size(input_value) == 1:
+        #     self._input_radius = input_value
+        # if np.size(input_value) != np.shape(self.vectors)[0] or np.size(input_value) != 1:
+        #     raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
+        if np.size(input_value) == 1:
+            self._input_radius = np.full(self.vectors.shape[0], input_value)
         else:
-            raise ValueError('Counter radii must either be a single value for all detectors, or a list with a radius corresponding to each defined counter location.')
+            self._input_radius = input_value
+            
 
     @property
     def N_counters(self) -> int:
