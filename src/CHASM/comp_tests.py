@@ -1,6 +1,9 @@
 import eventio
 import struct
 import CHASM as ch
+import matplotlib.pyplot as plt
+import numpy as np
+plt.ion()
 
 testfile = "../../demo/IACT_shower_noatt.dat"
 
@@ -26,7 +29,7 @@ sim.add(ch.SphericalCounters(cors_no_att.counter_vectors, cors_no_att.counter_ra
 #Add wavelength interval for Cherenkov yield calculation
 sim.add(ch.Yield(cors_no_att.min_l, cors_no_att.max_l,3))
 
-sig = sim.run()
+sig = sim.run(mesh = False)
 
 # b = ch.eventio_bytes(sig)
 ch.write_ei_file(sig, 'test.dat')
