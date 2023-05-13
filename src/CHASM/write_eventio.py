@@ -78,7 +78,7 @@ def create_data_blocks(sig: ShowerSignal) -> dict[str, dataclass]:
     block_dict = {
     'RunHeader': RunHeaderData(),
     'InputCard': InputCardData(),
-    #'AtmosphericProfile': AtmosphericProfileData(),
+    'AtmosphericProfile': AtmosphericProfileData(),
     }
     block_dict['TelescopeDefinition'] = make_tel_def(sig)
     block_dict['EventHeader'] = make_event_header(sig)
