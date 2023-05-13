@@ -7,7 +7,7 @@ class EventioType(Protocol):
     '''This is the base class for an eventio datatype.
     '''
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         '''This method should return the eventio style bytes of the type 
         corresponding to the implementation.
         '''
@@ -25,7 +25,7 @@ class Float:
     '''
     value: float
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         return struct.pack('<f', self.value)
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class String:
     '''
     value: str
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         byte_string = bytes(self.value, 'utf8')
         return struct.pack('<h',len(byte_string)) + byte_string
 
@@ -46,7 +46,7 @@ class Int:
     '''
     value: int
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         return self.value.to_bytes(4,'little')
 
 @dataclass(frozen=True)
@@ -56,8 +56,18 @@ class Varint:
     '''
     value: int
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         return self.value.to_bytes(1, 'little')
+
+@dataclass(frozen=True)
+class ThreeByte:
+    ''''This is the implementation of the three byte ints found in the 
+    eventio bytestream.
+    '''
+    value: int
+
+    def tobytes(self) -> bytes:
+        return self.value.to_bytes(3, 'little')
 
 @dataclass(frozen=True)
 class Varstring:
@@ -66,8 +76,8 @@ class Varstring:
     '''
     value: str
 
-    def to_bytes(self) -> bytes:
-        return Varint(len(self.value)).to_bytes() + bytes(self.value, 'utf8')
+    def tobytes(self) -> bytes:
+        return Varint(len(self.value)).tobytes() + bytes(self.value, 'utf8')
 
 @dataclass(frozen=True)
 class Double:
@@ -76,7 +86,7 @@ class Double:
     '''
     value: np.float64
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         return struct.pack('<d', self.value)
 
 @dataclass(frozen=True)
@@ -86,7 +96,7 @@ class Short:
     '''
     value: int
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         return struct.pack('<h', self.value)
     
 @dataclass
@@ -103,14 +113,17 @@ class PhotonsData:
     n_bunches: Int = Int(0)
     bunches: np.ndarray = field(default_factory= lambda: np.empty(0))
 
-    def to_bytes(self) -> bytes:
+    def tobytes(self) -> bytes:
         b = bytearray()
-        b.extend(self.type.to_bytes())
-        b.extend(self.id.to_bytes())
-        b.extend(self.length.to_bytes())
-        b.extend(self.arr.to_bytes())
-        b.extend(self.tel_no.to_bytes())
-        b.extend(self.n_photons.to_bytes())
-        b.extend(self.n_bunches.to_bytes())
-        b.extend(self.bunches.tobytes())
+        for field in self.__dataclass_fields__:
+            value = getattr(self, field)
+            b.extend(value.tobytes())
+        # b.extend(self.type.tobytes())
+        # b.extend(self.id.tobytes())
+        # b.extend(self.length.tobytes())
+        # b.extend(self.arr.tobytes())
+        # b.extend(self.tel_no.tobytes())
+        # b.extend(self.n_photons.tobytes())
+        # b.extend(self.n_bunches.tobytes())
+        # b.extend(self.bunches.tobytes())
         return b

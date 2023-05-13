@@ -3,7 +3,7 @@ from datetime import datetime
 import struct
 import numpy as np
 
-from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short, PhotonsData
+from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short, PhotonsData, ThreeByte
 from .config import AxisConfig
 from .simulation import ShowerSimulation, ShowerSignal
 from .axis import Axis, Counters
@@ -177,22 +177,25 @@ class TelescopeDefinitionData:
     IACT definition block.
     '''
     n_tel: Varint
-    empty_word: Float
-    tel_x: list[Float]
-    tel_y: list[Float]
-    tel_z: list[Float]
-    tel_r: list[Float]
+    empty_word: ThreeByte
+    tel_array: np.ndarray
+    # tel_x: list[Float]
+    # tel_y: list[Float]
+    # tel_z: list[Float]
+    # tel_r: list[Float]
 
 def make_tel_def(sig: ShowerSignal) -> TelescopeDefinitionData:
     '''This function returns an instantiated Telescope definition
      data block container.
     '''
-    vectors_cm = sig.counters.vectors * 100.
-    x = [Float(val) for val in vectors_cm[:,0].tolist()]
-    y = [Float(val) for val in vectors_cm[:,1].tolist()]
-    z = [Float(val) for val in vectors_cm[:,2].tolist()]
-    r = [Float(val) for val in np.full(sig.counters.N_counters,sig.counters.input_radius*100.).tolist()]
-    return TelescopeDefinitionData(Varint(sig.counters.N_counters),Float(0.),x,y,z,r)
+    vec_cm = np.array(sig.counters.vectors.T.flatten()*100, dtype=np.float32)
+    r_cm = np.array(sig.counters.input_radius*100, dtype=np.float32)
+    ta = np.append(vec_cm,r_cm)
+    # x = [Float(val) for val in vectors_cm[:,0].tolist()]
+    # y = [Float(val) for val in vectors_cm[:,1].tolist()]
+    # z = [Float(val) for val in vectors_cm[:,2].tolist()]
+    # r = [Float(val) for val in np.full(sig.counters.N_counters,sig.counters.input_radius*100.).tolist()]
+    return TelescopeDefinitionData(Varint(sig.counters.N_counters),ThreeByte(0),ta)
 
 @dataclass
 class EventHeaderData:

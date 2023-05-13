@@ -60,7 +60,7 @@ def append_EIType_to_buffer(buffer: bytearray, eitype: EventioType) -> None:
     '''This function appends the Eventio style bytes representing the datatype to
     a bytearray.
     '''
-    buffer.extend(eitype.to_bytes())
+    buffer.extend(eitype.tobytes())
 
 def block_to_bytes(block_data: dataclass) -> bytearray:
     '''This function takes the values in a block data dataclass container and writes
@@ -78,7 +78,7 @@ def create_data_blocks(sig: ShowerSignal) -> dict[str, dataclass]:
     block_dict = {
     'RunHeader': RunHeaderData(),
     'InputCard': InputCardData(),
-    'AtmosphericProfile': AtmosphericProfileData(),
+    #'AtmosphericProfile': AtmosphericProfileData(),
     }
     block_dict['TelescopeDefinition'] = make_tel_def(sig)
     block_dict['EventHeader'] = make_event_header(sig)
@@ -88,6 +88,12 @@ def create_data_blocks(sig: ShowerSignal) -> dict[str, dataclass]:
     block_dict['EventEnd'] = make_event_end(sig)
     block_dict['RunEnd'] = RunEnd()
     return block_dict
+
+def set_subob_bit(length: int):
+    '''This method toggles the 30th bit in the length int.
+    '''
+    mask = 1 << 30
+    return(int(length) ^ mask)
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
     '''This function writes the header bytes for an eventio file. These 16 
@@ -102,29 +108,31 @@ def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
     returns: bytes -> the header bytes
     '''
     b = bytearray(
-        SYNC_MARKER + Int(type).to_bytes()+ Int(id).to_bytes() + Int(length).to_bytes()
+        SYNC_MARKER + Int(type).tobytes()+ Int(id).tobytes()# + Int(length).to_bytes()
         )
     
     '''
     If it's the TelescopeData block, the header needs to have the 'only sub-objects'
-    flag set in the length word. Setting the last byte to ascii @ seems to accomplish
-    this lol.
+    flag set in the length word. 
     '''
     if type == 1204:
-        b = b[:-1] + b'@'
+        length = set_subob_bit(length)
+
+    b += Int(length).tobytes()
     return b
 
 class ImproperBlockSize(Exception):
     pass
 
-def eventio_bytes(sim: ShowerSimulation) -> bytearray:
+def eventio_bytes(sig: ShowerSignal) -> bytearray:
     '''This function returns the byte buffer of a mocked eventio file.
     '''
     byte_buffer = bytearray()
-    data_blocks = create_data_blocks(sim)
+    data_blocks = create_data_blocks(sig)
     for block_type in data_blocks:
         block_bytes = block_to_bytes(data_blocks[block_type])
-        byte_buffer.extend(object_header_bytes(IACT_TYPES[block_type], len(block_bytes)))
+        length = len(block_bytes)
+        byte_buffer.extend(object_header_bytes(IACT_TYPES[block_type], length))
         byte_buffer.extend(block_bytes)
     return byte_buffer
 

@@ -1,7 +1,7 @@
 from typing import Protocol
 import eventio
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .shower import Shower
 from .axis import Axis, Counters, MeshAxis, MeshShower, Timing, Attenuation, MakeSphericalCounters
@@ -102,6 +102,65 @@ class EventioWrapper(eventio.IACTFile):
             z_e = np.append(z_e,z / 100)
             p_e = np.append(p_e,p)
         return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
+
+def bunch_origins(file: eventio.IACTFile) -> tuple[np.ndarray]:
+    """
+    This function returns the emmission coordinates of CORSIKA photon bunches
+    and the number of photons at each emission coordinate (for each IACT)
+    """
+    event = next(iter(file))
+    x_e = []
+    y_e = []
+    z_e = []
+    p_e = []
+    obslevel = file.header[5][4]
+    for i in range(len(file.telescope_positions)):
+        pos = file.telescope_positions[i]
+        x_t = np.array(event.photon_bunches[i]['x'])
+        y_t = np.array(event.photon_bunches[i]['y'])
+        z = np.array(event.photon_bunches[i]['zem'])
+        cx = np.array(event.photon_bunches[i]['cx'])
+        cy = np.array(event.photon_bunches[i]['cy'])
+        p = np.array(event.photon_bunches[i]['photons'])
+        z -= obslevel
+        cxcy = cx**2 + cy**2
+        cxcy[cxcy>=1.] = 1 - 1.e-8
+        cz = np.sqrt(1 - (cxcy))
+        cz[cz==0] = 1.e-8
+        x = x_t - cx * z / cz + pos[0]
+        y = y_t - cy * z / cz + pos[1]
+        x_e = np.append(x_e,x / 100)
+        y_e = np.append(y_e,y / 100)
+        z_e = np.append(z_e,z / 100)
+        p_e = np.append(p_e,p)
+    return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
+
+def tel_bunch_origins(file: eventio.IACTFile, i: int) -> tuple[np.ndarray]:
+    """
+    This function returns the emmission coordinates of CORSIKA photon bunches
+    and the number of photons at each emission coordinate (for each IACT)
+    """
+    event = next(iter(file))
+    obslevel = file.header[5][4]
+    pos = file.telescope_positions[i]
+    x_t = np.array(event.photon_bunches[i]['x'])
+    y_t = np.array(event.photon_bunches[i]['y'])
+    z = np.array(event.photon_bunches[i]['zem'])
+    cx = np.array(event.photon_bunches[i]['cx'])
+    cy = np.array(event.photon_bunches[i]['cy'])
+    p = np.array(event.photon_bunches[i]['photons'])
+    z -= obslevel
+    cxcy = cx**2 + cy**2
+    # cxcy[cxcy>=1.] = 1 - 1.e-8
+    cz = np.sqrt(1 - (cxcy))
+    # cz[cz==0] = 1.e-8
+    x = x_t - cx * z / cz + pos[0]
+    y = y_t - cy * z / cz + pos[1]
+    x_e = x / 100
+    y_e = y / 100
+    z_e = z / 100
+    p_e = p
+    return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
 
 class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
@@ -218,14 +277,15 @@ def x_y_cx_cy(source_points: np.ndarray, counters: Counters) -> tuple[np.ndarray
         raise ValueError('Only spherical counters work when generating eventio format.')
     travel_vectors = counters.travel_vectors(source_points)
     travel_r = counters.travel_length(source_points)
-    cx = -travel_vectors[:,:,0] / travel_r
-    cy = -travel_vectors[:,:,1] / travel_r
-    x = counters.input_radius * cx.T
-    y = counters.input_radius * cy.T
-    # cz = travel_vectors[:,:,2] / travel_r
-    # x = (travel_vectors[:,:,0] - cx * travel_vectors[:,:,2] / cz).T - counters.vectors[:,0]
-    # y = (travel_vectors[:,:,1] - cy * travel_vectors[:,:,2] / cz).T - counters.vectors[:,1]
-    return x.T, y.T, cx, cy #convert to cm
+    cx = travel_vectors[:,:,0] / travel_r
+    cy = travel_vectors[:,:,1] / travel_r
+    r = (counters.input_radius * np.sqrt(np.random.uniform(size=cx.shape)).reshape(cx.shape).T)
+    phi = np.random.uniform(size=cx.shape).reshape(cx.shape) * 2 * np.pi
+    x = r.T * np.cos(phi)
+    y = r.T * np.sin(phi)
+    # x = counters.input_radius * cx.T
+    # y = counters.input_radius * cy.T
+    return x*100, y*100, cx, cy #convert to cm
 
 @dataclass
 class ShowerSignal:
@@ -234,16 +294,38 @@ class ShowerSignal:
     '''
     counters: Counters #counters object
     axis: Axis #axis object
-    source_points: np.ndarray #vectors to axis points
-    wavelengths: np.ndarray #wavelength of each bin, shape = (N_wavelengths)
-    photons: np.ndarray #number of photons from each step to each counter, shape = (N_counters, N_wavelengths, N_axis_points)
-    times: np.ndarray #arrival times of photons from each step to each counter, shape = (N_counters, N_axis_points)
-    charged_particles: np.ndarray
-    depths: np.ndarray
-    total_photons: np.ndarray
+    source_points: np.ndarray = field(repr=False) #vectors to axis points
+    wavelengths: np.ndarray = field(repr=False) #wavelength of each bin, shape = (N_wavelengths)
+    photons: np.ndarray = field(repr=False) #number of photons from each step to each counter, shape = (N_counters, N_wavelengths, N_axis_points)
+    times: np.ndarray = field(repr=False) #arrival times of photons from each step to each counter, shape = (N_counters, N_axis_points)
+    charged_particles: np.ndarray = field(repr=False)
+    depths: np.ndarray = field(repr=False)
+    total_photons: np.ndarray = field(repr=False)
 
     def __post_init__(self) -> None:
-        self.x, self.y, self.cx, self.cy = x_y_cx_cy(self.source_points, self.counters)
+        # self.x, self.y, self.cx, self.cy = x_y_cx_cy(self.source_points, self.counters)
+        self.x, self.y = self.rand_xy()
+        self.cx, self.cy = self.cx_cy()
+
+    def rand_xy(self) -> tuple[np.ndarray]:
+        '''This method generates a random x and y in a circle.
+        '''
+        shape = (self.photons.shape[0],self.photons.shape[-1])
+        r = (self.counters.input_radius*100 * np.sqrt(np.random.uniform(size=shape)).reshape(shape).T)
+        phi = np.random.uniform(size=shape).reshape(shape) * 2 * np.pi
+        x = r.T * np.cos(phi)
+        y = r.T * np.sin(phi)
+        return x, y
+
+    def cx_cy(self) -> tuple[np.ndarray]:
+        '''This method calculates the directional cosines x and y for the rays
+        from the source points to the counters.
+        '''
+        travel_vectors = self.counters.travel_vectors(self.source_points)
+        travel_r = np.sqrt((travel_vectors**2).sum(axis = -1))
+        cx = travel_vectors[:,:,0] / travel_r
+        cy = travel_vectors[:,:,1] / travel_r
+        return cx, cy
 
     def get_bunches(self, tel_id: int) -> np.ndarray:
         '''This method returns a list of photon bunches for the shower.
@@ -253,14 +335,16 @@ class ShowerSignal:
         The returned array is of shape (N_axis_points*N_wavelengths,8)
         '''
         photons = self.photons[tel_id]
+        filter_mask = photons.sum(axis=0) > 1.e-5
+        photons = photons[:,filter_mask]
         bunches = np.empty((photons.shape[0], photons.shape[1], 8), dtype=float)
         for i, l in enumerate(self.wavelengths):
-            bunches[i,:,0] = self.x[tel_id]
-            bunches[i,:,1] = self.y[tel_id]
-            bunches[i,:,2] = self.cx[tel_id]
-            bunches[i,:,3] = self.cy[tel_id]
-            bunches[i,:,4] = self.times[tel_id]
-            bunches[i,:,5] = self.source_points[:,2]
+            bunches[i,:,0] = self.x[tel_id,filter_mask]
+            bunches[i,:,1] = self.y[tel_id,filter_mask]
+            bunches[i,:,2] = self.cx[tel_id,filter_mask]
+            bunches[i,:,3] = self.cy[tel_id,filter_mask]
+            bunches[i,:,4] = self.times[tel_id,filter_mask]
+            bunches[i,:,5] = self.source_points[filter_mask,2]*100 #convert to cm
             bunches[i,:,6] = photons[i,:]
             bunches[i,:,7] = -l
         return bunches.reshape((-1,8)).astype(np.float32)
