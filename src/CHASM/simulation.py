@@ -308,13 +308,23 @@ class ShowerSignal:
         self.cx, self.cy = self.cx_cy()
 
     def rand_xy(self) -> tuple[np.ndarray]:
-        '''This method generates a random x and y in a circle.
+        '''This method generates a random x and y in the ellipse made by the 
+        shadow of the spherical detector.
         '''
+        travel_vectors = self.counters.travel_vectors(self.source_points)
+        cosQ = self.counters.cos_Q(self.source_points)
+        incoming_angle = np.arctan2(travel_vectors[:,:,1],travel_vectors[:,:,0])
+
+        '''generate random points in a circle'''
         shape = (self.photons.shape[0],self.photons.shape[-1])
-        r = (self.counters.input_radius*100 * np.sqrt(np.random.uniform(size=shape)).reshape(shape).T)
+        r = (self.counters.input_radius*100 * np.sqrt(np.random.uniform(size=shape)).reshape(shape).T).T
         phi = np.random.uniform(size=shape).reshape(shape) * 2 * np.pi
-        x = r.T * np.cos(phi)
-        y = r.T * np.sin(phi)
+
+        a = r / cosQ #major axis length
+
+        '''Transform points to detector shadow.'''
+        x = a * np.cos(incoming_angle) * np.cos(phi) - r * np.sin(incoming_angle) * np.sin(phi)
+        y = a * np.sin(incoming_angle) * np.cos(phi) + r * np.cos(incoming_angle) * np.sin(phi)
         return x, y
 
     def cx_cy(self) -> tuple[np.ndarray]:

@@ -662,6 +662,7 @@ def axis_to_mesh(lX: float, axis: Axis, shower: Shower, N_ring: int = 20) -> tup
     '''
     X = np.exp(lX) #number of moliere units for the radius of the ring
     X_to_m = X * axis.moliere_radius
+    X_to_m[X_to_m>300.] = 300.
     axis_t = shower.stage(axis.X)
     total_nch = shower.profile(axis.X) * LateralSpread.nch_fractions(axis_t,lX)
     axis_d = axis.delta
