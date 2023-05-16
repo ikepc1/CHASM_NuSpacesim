@@ -315,7 +315,7 @@ class ShowerSignal:
         cosQ = self.counters.cos_Q(self.source_points)
         incoming_angle = np.arctan2(travel_vectors[:,:,1],travel_vectors[:,:,0])
 
-        '''generate random points in a circle'''
+        '''generate random points in a circle with radius of detector sphere.'''
         shape = (self.photons.shape[0],self.photons.shape[-1])
         r = (self.counters.input_radius*100 * np.sqrt(np.random.uniform(size=shape)).reshape(shape).T).T
         phi = np.random.uniform(size=shape).reshape(shape) * 2 * np.pi
