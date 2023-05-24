@@ -1,11 +1,11 @@
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from datetime import datetime
 import struct
 import numpy as np
 
-from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short
+from .eventio_types import EventioType, Float, Double, String, Int, Varint, Varstring, Short, PhotonsData, ThreeByte
 from .config import AxisConfig
-from .simulation import ShowerSimulation
+from .simulation import ShowerSimulation, ShowerSignal
 from .axis import Axis, Counters
 from .shower import Shower
 from .generate_Cherenkov import MakeYield
@@ -94,6 +94,7 @@ class RunHeaderData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     header.
     '''
+    nwords: Int = Int(273)
     runh: Float = Float(struct.unpack('f',b'RUNH')[0])
     run_no: Float = Float(1.) #Run number
     date: Float = field(default_factory=date_to_float) #Date as float YYMMDD.
@@ -134,6 +135,7 @@ class InputCardData:
     '''This is a wrapper for the list of strings representing lines of 
     a CORSIKA steering file.
     '''
+    nstrings: Int = Int(1)
     lines: list[String] = field(default_factory= lambda: [String('Input Card Placeholder')])
 
 def atm_altitudes_km() -> list[Double]:
@@ -175,28 +177,32 @@ class TelescopeDefinitionData:
     IACT definition block.
     '''
     n_tel: Varint
-    empty_word: Float
-    tel_x: list[Float]
-    tel_y: list[Float]
-    tel_z: list[Float]
-    tel_r: list[Float]
+    empty_word: ThreeByte
+    tel_array: np.ndarray
+    # tel_x: list[Float]
+    # tel_y: list[Float]
+    # tel_z: list[Float]
+    # tel_r: list[Float]
 
-def make_tel_def(sim: ShowerSimulation) -> TelescopeDefinitionData:
+def make_tel_def(sig: ShowerSignal) -> TelescopeDefinitionData:
     '''This function returns an instantiated Telescope definition
      data block container.
     '''
-    vectors_cm = sim.counters.vectors * 100.
-    x = [Float(val) for val in vectors_cm[:,0].tolist()]
-    y = [Float(val) for val in vectors_cm[:,1].tolist()]
-    z = [Float(val) for val in vectors_cm[:,2].tolist()]
-    r = [Float(val) for val in np.full(sim.N_c,sim.counters.input_radius*100.).tolist()]
-    return TelescopeDefinitionData(Varint(sim.N_c),Float(0.),x,y,z,r)
+    vec_cm = np.array(sig.counters.vectors.T.flatten()*100, dtype=np.float32)
+    r_cm = np.array(sig.counters.input_radius*100, dtype=np.float32)
+    ta = np.append(vec_cm,r_cm)
+    # x = [Float(val) for val in vectors_cm[:,0].tolist()]
+    # y = [Float(val) for val in vectors_cm[:,1].tolist()]
+    # z = [Float(val) for val in vectors_cm[:,2].tolist()]
+    # r = [Float(val) for val in np.full(sig.counters.N_counters,sig.counters.input_radius*100.).tolist()]
+    return TelescopeDefinitionData(Varint(sig.counters.N_counters),ThreeByte(0),ta)
 
 @dataclass
 class EventHeaderData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     eventio event header block.
     '''
+    nwords: Int = Int(273)
     evth: Float = Float(struct.unpack('f',b'EVTH')[0])
     evno: Float = Float(1.)
     p_id: Float = Float(1.)
@@ -278,14 +284,14 @@ class EventHeaderData:
     transition_energy_low_high_energy_model: Float = Float(0.)
     later_versions_placeholders: list[Float] = field(default_factory= lambda: [Float(0.)] * 119)
 
-def make_event_header(sim: ShowerSimulation) -> EventHeaderData:
+def make_event_header(sig: ShowerSignal) -> EventHeaderData:
     '''This function makes an event header container for a CHASM
     simulation.
     '''
     return EventHeaderData(
-        zenith = Float(sim.axis.zenith),
-        azimuth = Float(sim.axis.azimuth),
-        obs_levels = [Float(sim.counters.vectors[:,2].min())] * 10
+        zenith = Float(sig.axis.zenith),
+        azimuth = Float(sig.axis.azimuth),
+        obs_levels = [Float(sig.counters.vectors[:,2].min())] * 10
     )
 
 @dataclass
@@ -293,16 +299,16 @@ class ArrayOffsetsData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     array offsets block.
     '''
-    n_offsets: Int = Int(1.)
+    n_offsets: Int = Int(1)
     t_offset: Float = Float(0)
     x_offset: Float = Float(0)
     y_offset: Float = Float(0)
 
-def make_array_offsets(sim: ShowerSimulation) -> ArrayOffsetsData:
+def make_array_offsets(sig: ShowerSignal) -> ArrayOffsetsData:
     '''This function extracts the time offset from a CHASM sim for 
     use in the ArrayOffsets datablock.
     '''
-    pass
+    return ArrayOffsetsData()
 
 @dataclass
 class LongitudinalData:
@@ -317,16 +323,24 @@ class LongitudinalData:
     nch: list[Float] = field(default_factory= lambda: [Float(0.)] * 1000)
     ng: list[Float] = field(default_factory= lambda: [Float(0.)] * 1000)
 
-def make_longitudinal(sim: ShowerSimulation) -> LongitudinalData:
+def make_longitudinal(sig: ShowerSignal) -> LongitudinalData:
     '''This function extracts the shower profile and total Cherenkov to include in the
     mock longitudinal data block.
     '''
-    X = sim.axis.X
+    X = sig.depths
     N_thick = int(np.floor(X.max()))
     Xs = np.arange(N_thick)
-    N_ch = [Float(val) for val in sim.shower.profile(Xs)]
-    ng_1g = np.interp(Xs,X[::-1],sim.total_ng_at_X()[::-1]).tolist()
+
+    #depending on upward vs downward axis, the depths will increasing or decreasing
+    #respectively. Numpy interp needs strictly increasing x values.
+    if np.all(np.diff(X) > 0.):
+        nch_1g = np.interp(Xs,X,sig.charged_particles).tolist()
+        ng_1g = np.interp(Xs,X,sig.total_photons).tolist()
+    else:
+        nch_1g = np.interp(Xs,X[::-1],sig.charged_particles[::-1]).tolist()
+        ng_1g = np.interp(Xs,X[::-1],sig.total_photons[::-1]).tolist()
     n_g = [Float(val) for val in ng_1g]
+    N_ch = [Float(val) for val in nch_1g]
     return LongitudinalData(nthick=Short(N_thick), nch=N_ch, ng=n_g)
 
 @dataclass
@@ -334,53 +348,49 @@ class TelescopeData:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     telescope events block.
     '''
+    tel_data: list[PhotonsData]
 
-@dataclass
-class PhotonsData:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    photon bunch block.
+def make_telescope_data(sig: ShowerSignal) -> TelescopeData:
+    '''This function constructs a TelescopeData object from a shower signal
+    object.
     '''
-
-@dataclass
-class CameraLayoutData:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    camera layout block.
-    '''
-
-@dataclass
-class TriggerTimeData:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    trigger time block.
-    '''
-
-@dataclass
-class PhotoElectrons:
-    '''This class contains all the parameters needed to construct a mock CORSIKA
-    photo electrons block.
-    '''
+    tel_data = []
+    for i in range(sig.counters.N_counters):
+        bunches = sig.get_bunches(i)
+        tel_data.append(PhotonsData(
+            id = Int(i),
+            length = Int(bunches.size*4 + 12), #4 bytes per float 12, in the header
+            tel_no = Short(i),
+            n_photons = Float(sig.photons[i].sum()),
+            n_bunches = Int(bunches.shape[0]),
+            bunches = bunches
+        ))
+    return TelescopeData(tel_data)
 
 @dataclass
 class EventEnd:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     event end block.
     '''
+    nwords: Int = Int(273)
+    evte: Float = Float(struct.unpack('f',b'EVTE')[0])
+    evt_no: Float = Float(1.)
+    n_photons: Float = Float(0.)
+    n_electrons: Float = Float(0.)
+    empty_words: list[Float] = field(default_factory= lambda: [Float(0.)] * 269)
+    
+def make_event_end(sig: ShowerSignal) -> EventEnd:
+    '''This finction makes an event end data block.
+    '''
+    return EventEnd(n_photons = Float(sig.total_photons.sum()),
+                    n_electrons = Float(sig.charged_particles.sum()))
 
 @dataclass
 class RunEnd:
     '''This class contains all the parameters needed to construct a mock CORSIKA
     run end block.
     '''
-
-# def run_header_bytes() -> bytearray:
-#     bb = object_header_bytes(IACT_TYPES['RunHeader'], 1096)
-#     bb.extend(block_to_bytes(RunHeaderData()))
-#     return bb
-
-# def input_card_bytes(card_lines: list[str]) -> bytearray:
-#     '''This function returns the byte buffer representing the eventio input 
-#     card data block'''
-#     block = object_header_bytes(IACT_TYPES['InputCard'], len(block))
-#     block.extend(len(card_lines).to_bytes(4,'little'))
-#     for line in card_lines:
-#         block.extend(String(line).to_bytes)
-#     return block
+    nwords: Int = Int(3)
+    rune: Float = Float(struct.unpack('f',b'RUNE')[0])
+    run_no: Float = Float(1.)
+    n_events: Float = Float(1.)

@@ -1,5 +1,6 @@
 import numpy as np
-# from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields
+from pathlib import Path
 # from datetime import datetime
 # import struct
 
@@ -35,9 +36,9 @@ IACT_OBJECTS = {
     'Longitudinal': LongitudinalData,
     'TelescopeData': TelescopeData,
     'Photons': PhotonsData,
-    'CameraLayout': CameraLayoutData,
-    'TriggerTime': TriggerTimeData,
-    'PhotoElectrons': PhotoElectrons,
+    # 'CameraLayout': CameraLayoutData,
+    # 'TriggerTime': TriggerTimeData,
+    # 'PhotoElectrons': PhotoElectrons,
     'EventEnd': EventEnd,
     'RunEnd': RunEnd,   
 }
@@ -59,7 +60,7 @@ def append_EIType_to_buffer(buffer: bytearray, eitype: EventioType) -> None:
     '''This function appends the Eventio style bytes representing the datatype to
     a bytearray.
     '''
-    buffer.extend(eitype.to_bytes())
+    buffer.extend(eitype.tobytes())
 
 def block_to_bytes(block_data: dataclass) -> bytearray:
     '''This function takes the values in a block data dataclass container and writes
@@ -71,18 +72,28 @@ def block_to_bytes(block_data: dataclass) -> bytearray:
         append_EIType_to_buffer(byte_buffer, value)
     return byte_buffer
 
-def create_data_blocks(sim: ShowerSimulation) -> dict[str, dataclass]:
+def create_data_blocks(sig: ShowerSignal) -> dict[str, dataclass]:
     '''This function instantiates the data block containers.
     '''
     block_dict = {
-    # 'RunHeader': RunHeaderData(),
-    # 'InputCard': InputCardData(),
-    # 'AtmosphericProfile': AtmosphericProfileData(),
+    'RunHeader': RunHeaderData(),
+    'InputCard': InputCardData(),
+    'AtmosphericProfile': AtmosphericProfileData(),
     }
-    # block_dict['TelescopeDefinition'] = make_tel_def(sim)
-    # block_dict['EventHeader'] = make_event_header(sim)
-    block_dict['Longitudinal'] = make_longitudinal(sim)
+    block_dict['TelescopeDefinition'] = make_tel_def(sig)
+    block_dict['EventHeader'] = make_event_header(sig)
+    block_dict['ArrayOffsets'] = make_array_offsets(sig)
+    block_dict['Longitudinal'] = make_longitudinal(sig)
+    block_dict['TelescopeData'] = make_telescope_data(sig)
+    block_dict['EventEnd'] = make_event_end(sig)
+    block_dict['RunEnd'] = RunEnd()
     return block_dict
+
+def set_subob_bit(length: int):
+    '''This method toggles the 30th bit in the length int.
+    '''
+    mask = 1 << 30
+    return(int(length) ^ mask)
 
 def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
     '''This function writes the header bytes for an eventio file. These 16 
@@ -96,23 +107,38 @@ def object_header_bytes(type: int, length: int, id: int = 0) -> bytearray:
     length: int -> size of the data block in bytes
     returns: bytes -> the header bytes
     '''
-    # type_bytes = int_to_bytes(type)
-    # length_bytes = int_to_bytes(length)
-    # return SYNC_MARKER + type_bytes + b'\x00\x00\x00\x00' + length_bytes
-    return bytearray(
-        SYNC_MARKER + Int(type).to_bytes()+ Int(id).to_bytes() + Int(length).to_bytes()
+    b = bytearray(
+        SYNC_MARKER + Int(type).tobytes()+ Int(id).tobytes()# + Int(length).to_bytes()
         )
+    
+    '''
+    If it's the TelescopeData block, the header needs to have the 'only sub-objects'
+    flag set in the length word. 
+    '''
+    if type == 1204:
+        length = set_subob_bit(length)
+
+    b += Int(length).tobytes()
+    return b
 
 class ImproperBlockSize(Exception):
     pass
 
-def eventio_bytes(sim: ShowerSimulation) -> bytearray:
+def eventio_bytes(sig: ShowerSignal) -> bytearray:
     '''This function returns the byte buffer of a mocked eventio file.
     '''
     byte_buffer = bytearray()
-    data_blocks = create_data_blocks(sim)
+    data_blocks = create_data_blocks(sig)
     for block_type in data_blocks:
         block_bytes = block_to_bytes(data_blocks[block_type])
-        byte_buffer.extend(object_header_bytes(IACT_TYPES[block_type], len(block_bytes)))
+        length = len(block_bytes)
+        byte_buffer.extend(object_header_bytes(IACT_TYPES[block_type], length))
         byte_buffer.extend(block_bytes)
     return byte_buffer
+
+def write_ei_file(sig: ShowerSignal, filename: str) -> None:
+    '''This function writes the CHASM output to an eventio file format.
+    '''
+    Path(filename).touch()
+    with open(filename,'wb') as ei_file:
+        ei_file.write(eventio_bytes(sig))
