@@ -63,13 +63,14 @@ Finally, we define the Cherenkov wavelength interval of interest.
 sim.add(ch.Yield(min_l, max_l, N_bins = 1))
 ```
 
-We can now run the simulation, and generate signals.
+We can now run the simulation, and generate signals. The simulation's run method takes two keyword boolean flags, 'mesh' specifies whether to use mesh sampling around the shower axis, 'att' specifies whether to use atmospheric extinction along the travel paths of the light. The run method returns a ShowerSignal object, which contains the number of photons, their arrival times, their wavelengths, and vectors to their source points.
 
 ```
-sim.run(mesh = True)
-sim.get_signal_sum()
-sim.get_attenuated_signal_sum()
-
-times = sim.get_signal_times()
-photons = sim.get_signal_times(att=False)
+sig = sim.run(mesh = True)
 ```
+
+CHASM can also write its output to the eventio format used by CORSIKA IACT. The function that does this takes ShowerSignal object and the target filename as arguments.
+
+'''
+ch.write_ei_file(sig, 'filename.dat')
+'''
