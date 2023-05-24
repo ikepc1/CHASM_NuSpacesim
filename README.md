@@ -71,6 +71,6 @@ sig = sim.run(mesh = True)
 
 CHASM can also write its output to the eventio format used by CORSIKA IACT. The function that does this takes ShowerSignal object and the target filename as arguments.
 
-'''
+```
 ch.write_ei_file(sig, 'filename.dat')
-'''
+```
