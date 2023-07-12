@@ -230,20 +230,20 @@ class Signal:
         Y = y.y_list(self.t, self.axis.delta)
         return 2. * self.Nch * self.axis.dr * Y
 
-    def calculate_ng(self):
-        '''This method returns the number of Cherenkov photons going toward
-        each counter from every axis bin
+    # def calculate_ng(self):
+    #     '''This method returns the number of Cherenkov photons going toward
+    #     each counter from every axis bin
 
-        The returned array is of size:
-        # of yield bins, with each entry being on size:
-        (# of counters, # of axis points)
-        '''
-        gg = self.calculate_gg()
-        ng_array = np.empty_like(self.yield_array, dtype='O')
-        for i, y in enumerate(self.yield_array):
-            y.set_yield_at_lX(self.axis.lX)
-            ng_array[i] = gg * self.calculate_yield(y) * self.omega
-        return ng_array
+    #     The returned array is of size:
+    #     # of yield bins, with each entry being on size:
+    #     (# of counters, # of axis points)
+    #     '''
+    #     gg = self.calculate_gg()
+    #     ng_array = np.empty_like(self.yield_array, dtype='O')
+    #     for i, y in enumerate(self.yield_array):
+    #         y.set_yield_at_lX(self.axis.lX)
+    #         ng_array[i] = gg * self.calculate_yield(y) * self.omega
+    #     return ng_array
     
     def calculate_ng(self) -> np.ndarray:
         '''This method returns the number of Cherenkov photons going toward
@@ -301,6 +301,7 @@ class ShowerSignal:
     charged_particles: np.ndarray = field(repr=False)
     depths: np.ndarray = field(repr=False)
     total_photons: np.ndarray = field(repr=False)
+    cos_theta: np.ndarray = field(repr=False)
 
     def __post_init__(self) -> None:
         # self.x, self.y, self.cx, self.cy = x_y_cx_cy(self.source_points, self.counters)
@@ -468,6 +469,7 @@ class ShowerSimulation:
         N_axis_points = self.axis.config.N_IN_RING * self.axis.r.size
         axis_vectors = np.empty((len(self.lX_intervals), N_axis_points, 3))
         photons_array = np.empty((self.N_c, len(self.y), len(self.lX_intervals), N_axis_points))
+        cQ_array = np.empty((self.N_c, len(self.y), len(self.lX_intervals), N_axis_points))
         times_array = np.empty((self.N_c, len(self.lX_intervals), N_axis_points))
 
         #calculate signal at each mesh ring
@@ -484,12 +486,14 @@ class ShowerSimulation:
                 photons_array[:,:,i] = signal.calculate_ng()
 
             times_array[:,i] = meshaxis.get_timing(self.counters).counter_time()
+            cQ_array[:,:,i] = self.counters.cos_Q(meshaxis.vectors)[:,np.newaxis,:]
         
         #sum photons at each depth step
         tot_at_X = photons_array.sum(axis=2).sum(axis=1).sum(axis=0).reshape(self.axis.r.size,-1).sum(axis=1)
 
         #flatten over mesh rings
         photons_array = photons_array.reshape((photons_array.shape[0],photons_array.shape[1],-1))
+        cQ_array = cQ_array.reshape((photons_array.shape[0],photons_array.shape[1],-1))
         times_array = times_array.reshape((times_array.shape[0],-1))
         axis_vectors = axis_vectors.reshape((-1,3))    
         
@@ -501,7 +505,8 @@ class ShowerSimulation:
                             times_array,
                             self.shower.profile(self.axis.X),
                             self.axis.X,
-                            tot_at_X)
+                            tot_at_X,
+                            cQ_array)
 
     def get_signal(self, att: bool) -> ShowerSignal:
         '''This method returns a ShowerSignal object with the photons calculated
@@ -514,6 +519,7 @@ class ShowerSimulation:
         else:
             photons_array = signal.calculate_ng()
         times_array = self.axis.get_timing(self.counters).counter_time()
+        cq = self.counters.cos_Q(self.axis.vectors)
         return ShowerSignal(self.counters, 
                             self.axis,
                             self.axis.vectors, 
@@ -522,7 +528,8 @@ class ShowerSimulation:
                             times_array,
                             self.shower.profile(self.axis.X),
                             self.axis.X,
-                            photons_array.sum(axis=1).sum(axis=0))
+                            photons_array.sum(axis=1).sum(axis=0),
+                            cq.reshape((cq.shape[0],-1,cq.shape[1])))
 
     def run(self, mesh: bool = False, att: bool = False) -> ShowerSignal:
         '''This method calculates the Cherenkov signal of a shower, and 

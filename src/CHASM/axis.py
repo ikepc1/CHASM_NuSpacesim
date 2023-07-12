@@ -351,14 +351,6 @@ class Axis(ABC):
         self.azimuth = params.azimuth
         self.altitude = self.set_initial_altitude()
 
-    def reset_for_profile(self, shower: Shower) -> None:
-        '''This method resets the attributes of the class based on where the shower
-        occurs on the axis. We dont need to run universality calculations where
-        there's no shower.
-        '''
-        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
-        self.altitude = self.altitude[ids]
-
     @property
     def zenith(self) -> float:
         '''polar angle  property getter'''
@@ -551,6 +543,13 @@ class Axis(ABC):
         For linear axes, it should return the regular gg array. For a mesh axis,
         it should return the gg array for the axis' particular log(moliere)
         interval.
+        '''
+
+    @abstractmethod
+    def reset_for_profile(self, shower: Shower) -> None:
+        '''This method re-defines the height attribute depending on where the shower 
+        falls along the axis. The purpose of this is to avoid running expensive 
+        calculations where no significant amount of particles exist.
         '''
 
 class MakeSphericalCounters(Counters):
@@ -817,6 +816,9 @@ class MeshAxis(Axis):
     #     # return 'gg_t_delta_theta_mc.npz'
     #     return 'gg_t_delta_theta_2020_normalized.npz'
 
+    def reset_for_profile(self, shower: Shower) -> None:
+        return self.linear_axis.reset_for_profile(shower)
+
 class MeshShower(Shower):
     '''This class is the implementation of a shower where the shower particles are
     distributed to a mesh axis rather than just the longitudinal axis.
@@ -855,6 +857,14 @@ class MakeUpwardAxis(Axis):
         '''In this case we need pi minus the interal angle across from the
         distance to the counter'''
         return np.pi - counters.calculate_theta(axis_vectors)
+    
+    def reset_for_profile(self, shower: Shower) -> None:
+        '''This method resets the attributes of the class based on where the shower
+        occurs on the axis. We dont need to run universality calculations where
+        there's no shower.
+        '''
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        self.altitude = self.altitude[np.argmax(ids):]
 
 class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
     '''This is the implementation of an upward going shower axis with a flat
@@ -930,6 +940,14 @@ class MakeDownwardAxis(Axis):
         '''This method returns the angle between the axis and the vector going
         to the counter, in this case it's the internal angle'''
         return counters.calculate_theta(axis_vectors)
+    
+    def reset_for_profile(self, shower: Shower) -> None:
+        '''This method resets the attributes of the class based on where the shower
+        occurs on the axis. We dont need to run universality calculations where
+        there's no shower.
+        '''
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        self.altitude = self.altitude[ids]
 
 class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
     '''This is the implementation of a downward going shower axis with a flat
