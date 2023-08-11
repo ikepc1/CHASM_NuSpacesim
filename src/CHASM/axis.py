@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from importlib.resources import as_file, files
 from scipy.constants import value,nano
 from scipy.spatial.transform import Rotation as R
+from scipy.integrate import cumtrapz
 # from scipy.stats import norm
 
 from .atmosphere import Atmosphere
@@ -661,7 +662,7 @@ def axis_to_mesh(lX: float, axis: Axis, shower: Shower, N_ring: int = 20) -> tup
     '''
     X = np.exp(lX) #number of moliere units for the radius of the ring
     X_to_m = X * axis.moliere_radius
-    X_to_m[X_to_m>300.] = 300.
+    X_to_m[X_to_m>axis.config.MAX_RING_SIZE] = axis.config.MAX_RING_SIZE
     axis_t = shower.stage(axis.X)
     total_nch = shower.profile(axis.X) * LateralSpread.nch_fractions(axis_t,lX)
     axis_d = axis.delta
@@ -846,8 +847,9 @@ class MakeUpwardAxis(Axis):
     def X(self) -> np.ndarray:
         '''This method sets the depth attribute'''
         rho = self.atm.density(self.altitude)
-        axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
-        return np.concatenate((np.array([0]),np.cumsum(axis_deltaX)))
+        # axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
+        # return np.concatenate((np.array([0]),np.cumsum(axis_deltaX)))
+        return cumtrapz(rho,self.r, initial=0.) / 10.
 
     def distance(self, X: np.ndarray) -> np.ndarray:
         '''This method is the distance along the axis as a function of depth'''
