@@ -1,10 +1,11 @@
 from typing import Protocol
+from functools import cached_property
 import numpy as np
 from abc import ABC, abstractmethod
 from importlib.resources import as_file, files
 from scipy.constants import value,nano
 from scipy.spatial.transform import Rotation as R
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumtrapz, quad
 # from scipy.stats import norm
 
 from .atmosphere import Atmosphere
@@ -518,6 +519,12 @@ class Axis(ABC):
         '''This method sets the depth along the shower axis attribute'''
 
     @abstractmethod
+    def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
+        '''This method is the integrand as a function of altitude for calculating slant
+        depth.
+        '''
+
+    @abstractmethod
     def distance(self, X: np.ndarray) -> np.ndarray:
         '''This method is the distance along the axis as a function of depth'''
 
@@ -771,6 +778,9 @@ class MeshAxis(Axis):
     def X(self) -> np.ndarray:
         '''This method sets the depth along the shower axis attribute'''
         return self.linear_axis.X
+    
+    def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
+        return self.linear_axis.slant_depth_integrand(h)
 
     def distance(self, X: np.ndarray) -> np.ndarray:
         '''This method is the distance along the axis as a function of depth'''
@@ -846,10 +856,15 @@ class MakeUpwardAxis(Axis):
     @property
     def X(self) -> np.ndarray:
         '''This method sets the depth attribute'''
-        rho = self.atm.density(self.altitude)
+        # rho = self.atm.density(self.altitude)
+        # return cumtrapz(rho,self.r, initial=0.) / 10.
         # axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
         # return np.concatenate((np.array([0]),np.cumsum(axis_deltaX)))
-        return cumtrapz(rho,self.r, initial=0.) / 10.
+        depths = np.zeros_like(self.r)
+        A = self.altitude[:-1]
+        B = self.altitude[1:]
+        depths[1:] = np.array([quad(self.slant_depth_integrand,a,b)[0] for a,b in zip(A,B)])
+        return np.cumsum(depths / 10.)
 
     def distance(self, X: np.ndarray) -> np.ndarray:
         '''This method is the distance along the axis as a function of depth'''
@@ -881,6 +896,11 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h / np.cos(self.zenith)
 
+    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+        '''This is the integrand needed to calculate slant depth.
+        '''
+        return self.atm.density(alt) / np.cos(self.zenith)
+
     def get_timing_class(self) -> np.ndarray:
         '''This method returns the upward flat atm timing class'''
         return UpwardTiming
@@ -908,6 +928,14 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
+    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+        '''This is the integrand needed to calculate slant depth.
+        '''
+        num = (alt + self.earth_radius)
+        denom = np.sqrt((np.cos(self.zenith)**2)*self.earth_radius**2 + alt**2 + 2*alt*self.earth_radius)
+        dL_dz = num / denom
+        return self.atm.density(alt) * dL_dz
+
     def get_timing_class(self) -> Timing:
         '''This method returns the upward flat atm timing class'''
         return UpwardTimingCurved
@@ -929,10 +957,15 @@ class MakeDownwardAxis(Axis):
     def X(self) -> np.ndarray:
         '''This method sets the depth attribute, depths are added along the axis
         in the downward direction'''
-        rho = self.atm.density(self.altitude)
-        axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
-        return np.concatenate((np.cumsum(axis_deltaX[::-1])[::-1],
-                    np.array([0])))
+        # rho = self.atm.density(self.altitude)
+        # axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
+        # return np.concatenate((np.cumsum(axis_deltaX[::-1])[::-1],
+        #             np.array([0])))
+        depths = np.zeros_like(self.r)
+        A = self.altitude[:-1]
+        B = self.altitude[1:]
+        depths[1:] = np.array([quad(self.slant_depth_integrand,a,b)[0] for a,b in zip(A,B)])
+        return np.cumsum(depths[::-1] / 10.)[::-1]
 
     def distance(self, X: np.ndarray) -> np.ndarray:
         '''This method is the distance along the axis as a function of depth'''
@@ -946,7 +979,7 @@ class MakeDownwardAxis(Axis):
     def reset_for_profile(self, shower: Shower) -> None:
         '''This method resets the attributes of the class based on where the shower
         occurs on the axis. We dont need to run universality calculations where
-        there's no shower.
+        there's no shower.self
         '''
         ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
         a = self.altitude[::-1]
@@ -960,6 +993,11 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
     def __repr__(self):
         return "DownwardAxisFlatPlanarAtm(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
         self.zenith, self.azimuth, self.ground_level)
+
+    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+        '''This is the integrand needed to calculate slant depth.
+        '''
+        return self.atm.density(alt) / np.cos(self.zenith)
 
     @property
     def r(self) -> np.ndarray:
@@ -994,6 +1032,14 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
     def r(self) -> np.ndarray:
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
+
+    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+        '''This is the integrand needed to calculate slant depth.
+        '''
+        num = (alt + self.earth_radius)
+        denom = np.sqrt((np.cos(self.zenith)**2)*self.earth_radius**2 + alt**2 + 2*alt*self.earth_radius)
+        dL_dz = num / denom
+        return self.atm.density(alt) * dL_dz
 
     def get_timing_class(self) -> Timing:
         '''This method returns the flat atm downward timing class
