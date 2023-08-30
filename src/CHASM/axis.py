@@ -964,7 +964,7 @@ class MakeDownwardAxis(Axis):
         depths = np.zeros_like(self.r)
         A = self.altitude[:-1]
         B = self.altitude[1:]
-        depths[1:] = np.array([quad(self.slant_depth_integrand,a,b)[0] for a,b in zip(A,B)])
+        depths[:-1] = np.array([quad(self.slant_depth_integrand,a,b)[0] for a,b in zip(A,B)])
         return np.cumsum(depths[::-1] / 10.)[::-1]
 
     def distance(self, X: np.ndarray) -> np.ndarray:
