@@ -37,12 +37,12 @@ class Counters(ABC):
         self._vectors = input_vectors
 
     @property
-    def input_radius(self) -> np.ndarray | float:
+    def input_radius(self) -> np.ndarray:
         '''This is the input counter radius getter.'''
         return self._input_radius
 
     @input_radius.setter
-    def input_radius(self, input_value: np.ndarray | float):
+    def input_radius(self, input_value: np.ndarray):
         '''This is the input counter radius setter.'''
         if type(input_value) != np.ndarray:
             input_value = np.array(input_value)
@@ -519,7 +519,7 @@ class Axis(ABC):
         '''This method sets the depth along the shower axis attribute'''
 
     @abstractmethod
-    def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
+    def slant_depth_integrand(self, h: float) -> float:
         '''This method is the integrand as a function of altitude for calculating slant
         depth.
         '''
@@ -779,7 +779,7 @@ class MeshAxis(Axis):
         '''This method sets the depth along the shower axis attribute'''
         return self.linear_axis.X
     
-    def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
+    def slant_depth_integrand(self, h: float) -> float:
         return self.linear_axis.slant_depth_integrand(h)
 
     def distance(self, X: np.ndarray) -> np.ndarray:
@@ -896,7 +896,7 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h / np.cos(self.zenith)
 
-    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+    def slant_depth_integrand(self, alt: float) -> float:
         '''This is the integrand needed to calculate slant depth.
         '''
         return self.atm.density(alt) / np.cos(self.zenith)
@@ -928,7 +928,7 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
-    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+    def slant_depth_integrand(self, alt: float) -> float:
         '''This is the integrand needed to calculate slant depth.
         '''
         num = (alt + self.earth_radius)
@@ -994,7 +994,7 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         return "DownwardAxisFlatPlanarAtm(theta={:.2f} rad, phi={:.2f} rad, ground_level={:.2f} m)".format(
         self.zenith, self.azimuth, self.ground_level)
 
-    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+    def slant_depth_integrand(self, alt: float) -> float:
         '''This is the integrand needed to calculate slant depth.
         '''
         return self.atm.density(alt) / np.cos(self.zenith)
@@ -1033,7 +1033,7 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''This is the axis distance property definition'''
         return self.h_to_axis_R_LOC(self.h, self.zenith)
 
-    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+    def slant_depth_integrand(self, alt: float) -> float:
         '''This is the integrand needed to calculate slant depth.
         '''
         num = (alt + self.earth_radius)
