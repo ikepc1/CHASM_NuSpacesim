@@ -56,6 +56,56 @@ class Atmosphere(ABC):
         '''
         return self.density(h) * 1.e3 *  self.avo / self.air_mol_weight
 
+    def depth(self,h1,h2=None):
+        """
+        This function returns atmospheric depth. It is the integral of atmospheric density between two heights.
+
+        Parameters:
+        These parameters can be ndarrays or single values.
+
+        h1 - height 1 in atmosphere. This can be an ndarray or a single value. [m]
+        h2 - height 2; Default is hMaxAtm. This can be an ndarray or a single value [m]
+
+        If both h1 and h2 are ndarrays, they must be the same size (the length
+        of the shorter array is used).
+
+        If h1 or h2 is greater than hMaxAtm, hMaxAtm is used.
+
+        Returns:
+        The integral of rho from h1 to h2. The result is converted into g/cm2.
+
+        """
+        if h2 is None:
+            h2 = self.maximum_height*np.ones_like(h1)
+
+        if type(h1) is not np.ndarray and type(h2) is not np.ndarray:
+            h1 = np.array([h1],dtype=float)
+            h2 = np.array([h2],dtype=float)
+            nin = 0
+        elif type(h2) is not np.ndarray:
+            h2 = h2*np.ones_like(h1)
+            nin = len(h1)
+        elif type(h1) is not np.ndarray:
+            h1 = h1*np.ones_like(h2)
+            nin = len(h2)
+        else:
+            nin = min(len(h1),len(h2))
+
+        A = h1.copy()
+        B = h2.copy()
+        A[A<self.minimum_height] = self.minimum_height
+        B[B<self.minimum_height] = self.minimum_height
+        A[A>self.maximum_height] = self.maximum_height
+        B[B>self.maximum_height] = self.maximum_height
+
+        depth = np.array([quad(self.density,a,b)[0] for a,b in zip(A,B)])
+        depth /= 10. # 1 km/m2 == 1000/10,000 g/cm2
+
+        if nin == 0:
+            return depth[0]
+        else:
+            return depth
+        
     @property
     @abstractmethod
     def name(self) -> str:
@@ -320,56 +370,6 @@ class USStandardAtmosphere(Atmosphere):
         P /= 1000.       # Pa -> kPa
         return 7.86e-4*P/T
 
-    def depth(self,h1,h2=None):
-        """
-        This function returns atmospheric depth. It is the integral of atmospheric density between two heights.
-
-        Parameters:
-        These parameters can be ndarrays or single values.
-
-        h1 - height 1 in atmosphere. This can be an ndarray or a single value. [m]
-        h2 - height 2; Default is hMaxAtm. This can be an ndarray or a single value [m]
-
-        If both h1 and h2 are ndarrays, they must be the same size (the length
-        of the shorter array is used).
-
-        If h1 or h2 is greater than hMaxAtm, hMaxAtm is used.
-
-        Returns:
-        The integral of rho from h1 to h2. The result is converted into g/cm2.
-
-        """
-        if h2 is None:
-            h2 = self.maximum_height*np.ones_like(h1)
-
-        if type(h1) is not np.ndarray and type(h2) is not np.ndarray:
-            h1 = np.array([h1],dtype=float)
-            h2 = np.array([h2],dtype=float)
-            nin = 0
-        elif type(h2) is not np.ndarray:
-            h2 = h2*np.ones_like(h1)
-            nin = len(h1)
-        elif type(h1) is not np.ndarray:
-            h1 = h1*np.ones_like(h2)
-            nin = len(h2)
-        else:
-            nin = min(len(h1),len(h2))
-
-        A = h1.copy()
-        B = h2.copy()
-        A[A<self.minimum_height] = self.minimum_height
-        B[B<self.minimum_height] = self.minimum_height
-        A[A>self.maximum_height] = self.maximum_height
-        B[B>self.maximum_height] = self.maximum_height
-
-        depth = np.array([quad(self.density,a,b)[0] for a,b in zip(A,B)])
-        depth /= 10. # 1 km/m2 == 1000/10,000 g/cm2
-
-        if nin == 0:
-            return depth[0]
-        else:
-            return depth
-
     def thickness(self) -> np.ndarray:
         '''This method returns an array of the thicknesses between
         altitudes.
@@ -379,81 +379,81 @@ class USStandardAtmosphere(Atmosphere):
         thicks[-1] = 0.
         return thicks
 
-    def slant_depth(self,theta,d1,d2=None):
-        """
-        This function returns atmospheric depth as a function of the slant angle with respect to the vertical.
+    # def slant_depth(self,theta,d1,d2=None):
+    #     """
+    #     This function returns atmospheric depth as a function of the slant angle with respect to the vertical.
 
-        Parameters:
-            theta - slant angle with respect to the vertical.This can be an ndarray or a single value. [rad]
-            d1 - Distance along slant trajectory. This can be an ndarray or a single value. [m]
-            d2 - Distance along slant trajectory. This can be an ndarray or a single value. [m]
+    #     Parameters:
+    #         theta - slant angle with respect to the vertical.This can be an ndarray or a single value. [rad]
+    #         d1 - Distance along slant trajectory. This can be an ndarray or a single value. [m]
+    #         d2 - Distance along slant trajectory. This can be an ndarray or a single value. [m]
 
-        If both theta, d1, and d2 are all ndarrays, they must be the same size (the length
-        of the shortest array is used).
+    #     If both theta, d1, and d2 are all ndarrays, they must be the same size (the length
+    #     of the shortest array is used).
 
-        If d1 or d2 is are beyond the limits of the atmosphere, the limit of the atmosphere is used
+    #     If d1 or d2 is are beyond the limits of the atmosphere, the limit of the atmosphere is used
 
-        If d2 is not specified, the limit of the atmosphere is used.
+    #     If d2 is not specified, the limit of the atmosphere is used.
 
-        A flat-Earth model is assumed, so theta=pi/2 will give infinite results
+    #     A flat-Earth model is assumed, so theta=pi/2 will give infinite results
 
-        Returns:
-            The slant depth from d2 to d1 at angle theta. [g/cm2]
-        """
-        if d2 is None:
-            d2 = self.maximum_height/np.cos(theta)
+    #     Returns:
+    #         The slant depth from d2 to d1 at angle theta. [g/cm2]
+    #     """
+    #     if d2 is None:
+    #         d2 = self.maximum_height/np.cos(theta)
 
-        if type(theta) is not np.ndarray and \
-           type(d1) is not np.ndarray and \
-           type(d2) is not np.ndarray:
-            theta = np.array([theta],dtype=float)
-            d1 = np.array([d1],dtype=float)
-            d2 = np.array([d2],dtype=float)
-            nin = 0
-        elif type(d1) is not np.ndarray and \
-             type(d2) is not np.ndarray:
-            d1 = d1*np.ones_like(theta)
-            d2 = d2*np.ones_like(theta)
-            nin = len(theta)
-        elif type(theta) is not np.ndarray and \
-             type(d2) is not np.ndarray:
-            theta = theta*np.ones_like(d1)
-            d2 = d2*np.ones_like(d1)
-            nin = len(d1)
-        elif type(theta) is not np.ndarray and \
-             type(d1) is not np.ndarray:
-            theta = theta*np.ones_like(d2)
-            d1 = d1*np.ones_like(d2)
-            nin = len(d2)
-        elif type(theta) is not np.ndarray:
-            theta = theta*np.ones_like(d1)
-            nin = min(len(d1),len(d2))
-        elif type(d1) is not np.ndarray:
-            d1 = d1*np.ones_like(theta)
-            nin = min(len(theta),len(d2))
-        elif type(d2) is not np.ndarray:
-            d2 = d2*np.ones_like(theta)
-            nin = min(len(theta),len(d1))
-        else:
-            nin = min(len(theta),len(d1),len(d2))
+    #     if type(theta) is not np.ndarray and \
+    #        type(d1) is not np.ndarray and \
+    #        type(d2) is not np.ndarray:
+    #         theta = np.array([theta],dtype=float)
+    #         d1 = np.array([d1],dtype=float)
+    #         d2 = np.array([d2],dtype=float)
+    #         nin = 0
+    #     elif type(d1) is not np.ndarray and \
+    #          type(d2) is not np.ndarray:
+    #         d1 = d1*np.ones_like(theta)
+    #         d2 = d2*np.ones_like(theta)
+    #         nin = len(theta)
+    #     elif type(theta) is not np.ndarray and \
+    #          type(d2) is not np.ndarray:
+    #         theta = theta*np.ones_like(d1)
+    #         d2 = d2*np.ones_like(d1)
+    #         nin = len(d1)
+    #     elif type(theta) is not np.ndarray and \
+    #          type(d1) is not np.ndarray:
+    #         theta = theta*np.ones_like(d2)
+    #         d1 = d1*np.ones_like(d2)
+    #         nin = len(d2)
+    #     elif type(theta) is not np.ndarray:
+    #         theta = theta*np.ones_like(d1)
+    #         nin = min(len(d1),len(d2))
+    #     elif type(d1) is not np.ndarray:
+    #         d1 = d1*np.ones_like(theta)
+    #         nin = min(len(theta),len(d2))
+    #     elif type(d2) is not np.ndarray:
+    #         d2 = d2*np.ones_like(theta)
+    #         nin = min(len(theta),len(d1))
+    #     else:
+    #         nin = min(len(theta),len(d1),len(d2))
 
-        costheta = np.cos(theta)
-        A = d1.copy()
-        B = d2.copy()
-        A[A<self.minimum_height] = self.minimum_height
-        B[B<self.minimum_height] = self.minimum_height
-        bigA = A>self.maximum_height/costheta
-        A[bigA] = self.maximum_height/costheta[bigA]
-        bigB = B>self.maximum_height/costheta
-        B[bigB] = self.maximum_height/costheta[bigB]
+    #     costheta = np.cos(theta)
+    #     A = d1.copy()
+    #     B = d2.copy()
+    #     A[A<self.minimum_height] = self.minimum_height
+    #     B[B<self.minimum_height] = self.minimum_height
+    #     bigA = A>self.maximum_height/costheta
+    #     A[bigA] = self.maximum_height/costheta[bigA]
+    #     bigB = B>self.maximum_height/costheta
+    #     B[bigB] = self.maximum_height/costheta[bigB]
 
-        h1 = A*costheta
-        h2 = B*costheta
+    #     h1 = A*costheta
+    #     h2 = B*costheta
 
-        if nin == 0:
-            return self.depth(h1,h2)/costheta[0]
-        else:
-            return self.depth(h1,h2)/costheta
+    #     if nin == 0:
+    #         return self.depth(h1,h2)/costheta[0]
+    #     else:
+    #         return self.depth(h1,h2)/costheta
 
 class CorsikaAtmosphere(Atmosphere):
     '''This is the implementation of a CORSIKA tabulated atmosphere.
@@ -471,6 +471,7 @@ class CorsikaAtmosphere(Atmosphere):
         self._thicks = self.atm_data[:,2]
         self._deltas = self.atm_data[:,3]
         self.maximum_height = self.altitudes.max()
+        self.minimum_height = self.altitudes.min()
 
     @property
     def name(self):
