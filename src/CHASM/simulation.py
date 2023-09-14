@@ -1,5 +1,5 @@
 from typing import Protocol
-import eventio
+# import eventio
 import numpy as np
 from dataclasses import dataclass, field
 
@@ -9,158 +9,158 @@ from .generate_Cherenkov import MakeYield
 from .cherenkov_photon_array import CherenkovPhotonArray
 
 #Wrap eventio for extraction of CORSIKA shower data.
-class EventioWrapper(eventio.IACTFile):
-    def __init__(self, corsika_filename):
-        super().__init__(corsika_filename)
-        self.event = self.get_event()
-        self.theta = self.event.header[10]
-        self.phi = self.event.header[11] + np.pi #CHASM coordinate system rhat points up the axis, not down like CORSIKA
-        self.obs = self.event.header[5]/100. #convert obs level to meters
-        nl = self.event.longitudinal['nthick'] #number of depth steps
-        self.X = np.arange(nl, dtype=float) * self.event.longitudinal['thickstep'] #create depth steps
-        self.nch = np.array(self.event.longitudinal['data'][6]) #corresponding number of charged particles
-        counter_x = self.telescope_positions['x']/100. # cm -> m
-        counter_y = self.telescope_positions['y']/100. # cm -> m
-        counter_z = self.telescope_positions['z']/100. # cm -> m
-        self.counter_r = np.sqrt(counter_x**2 + counter_y**2 + counter_z**2)
-        self.counter_radius = self.telescope_positions['r']/100. # cm -> m
-        self.counter_vectors = np.vstack((counter_x,counter_y,counter_z)).T
-        self.iact_nc = len(self.counter_r)
-        self.min_l = self.event.header[57] #wavelength in nm
-        self.max_l = self.event.header[58] #wavelength in nm
-        self.ng_sum = np.array([self.event.n_photons[i] for i in range(len(counter_x))])
-        self.percs_and_bins(self.event)
+# class EventioWrapper(eventio.IACTFile):
+#     def __init__(self, corsika_filename):
+#         super().__init__(corsika_filename)
+#         self.event = self.get_event()
+#         self.theta = self.event.header[10]
+#         self.phi = self.event.header[11] + np.pi #CHASM coordinate system rhat points up the axis, not down like CORSIKA
+#         self.obs = self.event.header[5]/100. #convert obs level to meters
+#         nl = self.event.longitudinal['nthick'] #number of depth steps
+#         self.X = np.arange(nl, dtype=float) * self.event.longitudinal['thickstep'] #create depth steps
+#         self.nch = np.array(self.event.longitudinal['data'][6]) #corresponding number of charged particles
+#         counter_x = self.telescope_positions['x']/100. # cm -> m
+#         counter_y = self.telescope_positions['y']/100. # cm -> m
+#         counter_z = self.telescope_positions['z']/100. # cm -> m
+#         self.counter_r = np.sqrt(counter_x**2 + counter_y**2 + counter_z**2)
+#         self.counter_radius = self.telescope_positions['r']/100. # cm -> m
+#         self.counter_vectors = np.vstack((counter_x,counter_y,counter_z)).T
+#         self.iact_nc = len(self.counter_r)
+#         self.min_l = self.event.header[57] #wavelength in nm
+#         self.max_l = self.event.header[58] #wavelength in nm
+#         self.ng_sum = np.array([self.event.n_photons[i] for i in range(len(counter_x))])
+#         self.percs_and_bins(self.event)
 
-    def get_event(self, event_index: int = 0):
-        '''This method returns an individual shower event from the CORSIKA IACT file.'''
-        event_list = []
-        for event in self:
-            event_list.append(event)
-        if len(event_list) == 1:
-            return event_list[0]
-        else:
-            return event_list[event_index]
+#     def get_event(self, event_index: int = 0):
+#         '''This method returns an individual shower event from the CORSIKA IACT file.'''
+#         event_list = []
+#         for event in self:
+#             event_list.append(event)
+#         if len(event_list) == 1:
+#             return event_list[0]
+#         else:
+#             return event_list[event_index]
 
-    def percs_and_bins(self, event):
-        pb = []
-        for i in range(self.iact_nc):
-            if np.size(event.photon_bunches[i]['time']) == 0:
-                pb.append(np.array([0.]))
-            else:
-                pb.append(event.photon_bunches[i]['time'])
-        iact_gmnt = np.array([pb[i].min() for i in range(self.iact_nc)])
-        iact_gmxt = np.array([pb[i].max() for i in range(self.iact_nc)])
-        iact_g05t = np.array([np.percentile(pb[i], 5.) for i in range(self.iact_nc)])
-        iact_g95t = np.array([np.percentile(pb[i],95.) for i in range(self.iact_nc)])
-        iact_gd90 = iact_g95t-iact_g05t
-        iact_g01t = np.array([np.percentile(pb[i], 1.) for i in range(self.iact_nc)])
-        iact_g99t = np.array([np.percentile(pb[i],99.) for i in range(self.iact_nc)])
-        iact_ghdt = np.ones_like(iact_gmnt)
-        iact_ghdt[iact_gd90<30.]   = 0.2
-        iact_ghdt[iact_gd90>100.] = 5.
-        self.iact_ghmn = np.floor(iact_gmnt)
-        self.iact_ghmn[iact_ghdt==5.] = 5*np.floor(self.iact_ghmn[iact_ghdt==5.]/5.)
-        self.iact_ghmx = np.ceil(iact_gmxt)
-        self.iact_ghmx[iact_ghdt==5.] = 5*np.ceil(self.iact_ghmx[iact_ghdt==5.]/5.)
-        self.iact_ghnb = ((self.iact_ghmx-self.iact_ghmn)/iact_ghdt).astype(int)
-        self.iact_ghnb[self.iact_ghnb == 0] = 1
+#     def percs_and_bins(self, event):
+#         pb = []
+#         for i in range(self.iact_nc):
+#             if np.size(event.photon_bunches[i]['time']) == 0:
+#                 pb.append(np.array([0.]))
+#             else:
+#                 pb.append(event.photon_bunches[i]['time'])
+#         iact_gmnt = np.array([pb[i].min() for i in range(self.iact_nc)])
+#         iact_gmxt = np.array([pb[i].max() for i in range(self.iact_nc)])
+#         iact_g05t = np.array([np.percentile(pb[i], 5.) for i in range(self.iact_nc)])
+#         iact_g95t = np.array([np.percentile(pb[i],95.) for i in range(self.iact_nc)])
+#         iact_gd90 = iact_g95t-iact_g05t
+#         iact_g01t = np.array([np.percentile(pb[i], 1.) for i in range(self.iact_nc)])
+#         iact_g99t = np.array([np.percentile(pb[i],99.) for i in range(self.iact_nc)])
+#         iact_ghdt = np.ones_like(iact_gmnt)
+#         iact_ghdt[iact_gd90<30.]   = 0.2
+#         iact_ghdt[iact_gd90>100.] = 5.
+#         self.iact_ghmn = np.floor(iact_gmnt)
+#         self.iact_ghmn[iact_ghdt==5.] = 5*np.floor(self.iact_ghmn[iact_ghdt==5.]/5.)
+#         self.iact_ghmx = np.ceil(iact_gmxt)
+#         self.iact_ghmx[iact_ghdt==5.] = 5*np.ceil(self.iact_ghmx[iact_ghdt==5.]/5.)
+#         self.iact_ghnb = ((self.iact_ghmx-self.iact_ghmn)/iact_ghdt).astype(int)
+#         self.iact_ghnb[self.iact_ghnb == 0] = 1
 
-    def get_photon_times(self, counter_index: int, event_index: int = 0):
-        '''This method returns the array of arrival times for each photon bunch for a particular
-        event and counter.'''
-        return self.get_event(event_index).photon_bunches[counter_index]['time']
+#     def get_photon_times(self, counter_index: int, event_index: int = 0):
+#         '''This method returns the array of arrival times for each photon bunch for a particular
+#         event and counter.'''
+#         return self.get_event(event_index).photon_bunches[counter_index]['time']
 
-    def get_photons(self, counter_index: int, event_index: int = 0):
-        '''This method returns the array of the number of photons in each photon bunch for a particular
-        event and counter.'''
-        return self.get_event(event_index).photon_bunches[counter_index]['photons']
+#     def get_photons(self, counter_index: int, event_index: int = 0):
+#         '''This method returns the array of the number of photons in each photon bunch for a particular
+#         event and counter.'''
+#         return self.get_event(event_index).photon_bunches[counter_index]['photons']
 
-    def shower_coordinates(self):
-        """
-        This function returns the emmission coordinates of CORSIKA photon bunches
-        and the number of photons at each emission coordinate (for each IACT)
-        """
-        x_e = []
-        y_e = []
-        z_e = []
-        p_e = []
-        obslevel = self.header[5][4]
-        for i in range(len(self.telescope_positions)):
-            pos = self.telescope_positions[i]
-            x_t = np.array(self.event.photon_bunches[i]['x'])
-            y_t = np.array(self.event.photon_bunches[i]['y'])
-            z = np.array(self.event.photon_bunches[i]['zem'])
-            cx = np.array(self.event.photon_bunches[i]['cx'])
-            cy = np.array(self.event.photon_bunches[i]['cy'])
-            p = np.array(self.event.photon_bunches[i]['photons'])
-            z -= obslevel
-            cz = np.sqrt(1 - (cx**2 + cy**2))
-            x = x_t - cx * z / cz + pos[0]
-            y = y_t - cy * z / cz + pos[1]
-            x_e = np.append(x_e,x / 100)
-            y_e = np.append(y_e,y / 100)
-            z_e = np.append(z_e,z / 100)
-            p_e = np.append(p_e,p)
-        return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
+#     def shower_coordinates(self):
+#         """
+#         This function returns the emmission coordinates of CORSIKA photon bunches
+#         and the number of photons at each emission coordinate (for each IACT)
+#         """
+#         x_e = []
+#         y_e = []
+#         z_e = []
+#         p_e = []
+#         obslevel = self.header[5][4]
+#         for i in range(len(self.telescope_positions)):
+#             pos = self.telescope_positions[i]
+#             x_t = np.array(self.event.photon_bunches[i]['x'])
+#             y_t = np.array(self.event.photon_bunches[i]['y'])
+#             z = np.array(self.event.photon_bunches[i]['zem'])
+#             cx = np.array(self.event.photon_bunches[i]['cx'])
+#             cy = np.array(self.event.photon_bunches[i]['cy'])
+#             p = np.array(self.event.photon_bunches[i]['photons'])
+#             z -= obslevel
+#             cz = np.sqrt(1 - (cx**2 + cy**2))
+#             x = x_t - cx * z / cz + pos[0]
+#             y = y_t - cy * z / cz + pos[1]
+#             x_e = np.append(x_e,x / 100)
+#             y_e = np.append(y_e,y / 100)
+#             z_e = np.append(z_e,z / 100)
+#             p_e = np.append(p_e,p)
+#         return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
 
-def bunch_origins(file: eventio.IACTFile) -> tuple[np.ndarray]:
-    """
-    This function returns the emmission coordinates of CORSIKA photon bunches
-    and the number of photons at each emission coordinate (for each IACT)
-    """
-    event = next(iter(file))
-    x_e = []
-    y_e = []
-    z_e = []
-    p_e = []
-    obslevel = file.header[5][4]
-    for i in range(len(file.telescope_positions)):
-        pos = file.telescope_positions[i]
-        x_t = np.array(event.photon_bunches[i]['x'])
-        y_t = np.array(event.photon_bunches[i]['y'])
-        z = np.array(event.photon_bunches[i]['zem'])
-        cx = np.array(event.photon_bunches[i]['cx'])
-        cy = np.array(event.photon_bunches[i]['cy'])
-        p = np.array(event.photon_bunches[i]['photons'])
-        z -= obslevel
-        cxcy = cx**2 + cy**2
-        cxcy[cxcy>=1.] = 1 - 1.e-8
-        cz = np.sqrt(1 - (cxcy))
-        cz[cz==0] = 1.e-8
-        x = x_t - cx * z / cz + pos[0]
-        y = y_t - cy * z / cz + pos[1]
-        x_e = np.append(x_e,x / 100)
-        y_e = np.append(y_e,y / 100)
-        z_e = np.append(z_e,z / 100)
-        p_e = np.append(p_e,p)
-    return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
+# def bunch_origins(file: eventio.IACTFile) -> tuple[np.ndarray]:
+#     """
+#     This function returns the emmission coordinates of CORSIKA photon bunches
+#     and the number of photons at each emission coordinate (for each IACT)
+#     """
+#     event = next(iter(file))
+#     x_e = []
+#     y_e = []
+#     z_e = []
+#     p_e = []
+#     obslevel = file.header[5][4]
+#     for i in range(len(file.telescope_positions)):
+#         pos = file.telescope_positions[i]
+#         x_t = np.array(event.photon_bunches[i]['x'])
+#         y_t = np.array(event.photon_bunches[i]['y'])
+#         z = np.array(event.photon_bunches[i]['zem'])
+#         cx = np.array(event.photon_bunches[i]['cx'])
+#         cy = np.array(event.photon_bunches[i]['cy'])
+#         p = np.array(event.photon_bunches[i]['photons'])
+#         z -= obslevel
+#         cxcy = cx**2 + cy**2
+#         cxcy[cxcy>=1.] = 1 - 1.e-8
+#         cz = np.sqrt(1 - (cxcy))
+#         cz[cz==0] = 1.e-8
+#         x = x_t - cx * z / cz + pos[0]
+#         y = y_t - cy * z / cz + pos[1]
+#         x_e = np.append(x_e,x / 100)
+#         y_e = np.append(y_e,y / 100)
+#         z_e = np.append(z_e,z / 100)
+#         p_e = np.append(p_e,p)
+#     return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
 
-def tel_bunch_origins(file: eventio.IACTFile, i: int) -> tuple[np.ndarray]:
-    """
-    This function returns the emmission coordinates of CORSIKA photon bunches
-    and the number of photons at each emission coordinate (for each IACT)
-    """
-    event = next(iter(file))
-    obslevel = file.header[5][4]
-    pos = file.telescope_positions[i]
-    x_t = np.array(event.photon_bunches[i]['x'])
-    y_t = np.array(event.photon_bunches[i]['y'])
-    z = np.array(event.photon_bunches[i]['zem'])
-    cx = np.array(event.photon_bunches[i]['cx'])
-    cy = np.array(event.photon_bunches[i]['cy'])
-    p = np.array(event.photon_bunches[i]['photons'])
-    z -= obslevel
-    cxcy = cx**2 + cy**2
-    # cxcy[cxcy>=1.] = 1 - 1.e-8
-    cz = np.sqrt(1 - (cxcy))
-    # cz[cz==0] = 1.e-8
-    x = x_t - cx * z / cz + pos[0]
-    y = y_t - cy * z / cz + pos[1]
-    x_e = x / 100
-    y_e = y / 100
-    z_e = z / 100
-    p_e = p
-    return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
+# def tel_bunch_origins(file: eventio.IACTFile, i: int) -> tuple[np.ndarray]:
+#     """
+#     This function returns the emmission coordinates of CORSIKA photon bunches
+#     and the number of photons at each emission coordinate (for each IACT)
+#     """
+#     event = next(iter(file))
+#     obslevel = file.header[5][4]
+#     pos = file.telescope_positions[i]
+#     x_t = np.array(event.photon_bunches[i]['x'])
+#     y_t = np.array(event.photon_bunches[i]['y'])
+#     z = np.array(event.photon_bunches[i]['zem'])
+#     cx = np.array(event.photon_bunches[i]['cx'])
+#     cy = np.array(event.photon_bunches[i]['cy'])
+#     p = np.array(event.photon_bunches[i]['photons'])
+#     z -= obslevel
+#     cxcy = cx**2 + cy**2
+#     # cxcy[cxcy>=1.] = 1 - 1.e-8
+#     cz = np.sqrt(1 - (cxcy))
+#     # cz[cz==0] = 1.e-8
+#     x = x_t - cx * z / cz + pos[0]
+#     y = y_t - cy * z / cz + pos[1]
+#     x_e = x / 100
+#     y_e = y / 100
+#     z_e = z / 100
+#     p_e = p
+#     return np.array(x_e),np.array(y_e),np.array(z_e),np.array(p_e)
 
 class Signal:
     '''This class calculates the Cherenkov signal from a given shower axis at
