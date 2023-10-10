@@ -82,7 +82,8 @@ class Counters(ABC):
         '''This method returns the full area of the counting aperture.'''
         return np.pi * self.input_radius**2
 
-    def law_of_cosines(self, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def law_of_cosines(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
         '''This method returns the angle C across from side c in triangle abc'''
         cos_C = (c**2 - a**2 - b**2)/(-2*a*b)
         cos_C[cos_C > 1.] = 1.
