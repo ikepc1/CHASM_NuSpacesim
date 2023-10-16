@@ -1080,7 +1080,6 @@ def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counte
     cQ = counters.cos_Q(axis.vectors)
     integrals = np.empty_like(cQ)
     Q = np.arccos(cQ)
-    sQ = np.sin(Q)
     cQd = np.cos(axis.theta_difference)
     sQd = np.sin(axis.theta_difference)
     for i in range(integrals.shape[1]):
@@ -1116,7 +1115,6 @@ def upward_curved_correction(axis: MakeUpwardAxisCurvedAtm, counters: Counters, 
     cQ = counters.cos_Q(axis.vectors)
     integrals = np.empty_like(cQ)
     Q = np.arccos(cQ)
-    sQ = np.sin(Q)
     cQd = np.cos(axis.theta_difference)
     sQd = np.sin(axis.theta_difference)
     for i in range(integrals.shape[1]):
