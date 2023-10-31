@@ -1,7 +1,9 @@
 from typing import Protocol
 import eventio
 import numpy as np
-from dataclasses import dataclass, field
+from astropy.table import QTable, Table, Column
+from astropy import units as u
+from dataclasses import dataclass, field, asdict
 
 from .shower import Shower
 from .axis import Axis, Counters, MeshAxis, MeshShower, Timing, Attenuation, MakeSphericalCounters
@@ -544,7 +546,17 @@ class ShowerSimulation:
         else:
             return(self.get_signal(att))
 
-
+def signal_to_astropy(sig: ShowerSignal) -> QTable:
+    '''This function outputs the data in a shower signal object to an astropy table.
+    '''
+    column_list = []
+    column_list.append(Column(sig.source_points, name='source points',unit=u.m))
+    column_list.append(Column(sig.charged_particles, name='charged particles',unit=u.ct))
+    column_list.append(Column(sig.depths, name='depths',unit=u.g/u.cm**2))
+    for i in range(sig.photons.shape[0]):
+        column_list.append(Column(sig.photons[i].T, name=f'counter {i} photons',unit=u.ct))
+        column_list.append(Column(sig.times[i].T, name=f'counter {i} arrival times',unit=u.nanosecond))
+    return QTable(column_list)
 
     # def run(self, mesh: bool = False, att: bool = False):
     #     '''This is the proprietary run method which creates the arrays of
