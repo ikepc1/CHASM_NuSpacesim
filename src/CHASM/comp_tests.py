@@ -2,12 +2,13 @@ import eventio
 import struct
 import CHASM as ch
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 plt.ion()
 
-# testfile = "/home/isaac/corsika_data/60deg/iact_DAT000001.dat"
+testfile = "/home/isaac/corsika_data/phi_45_degrees/iact_DAT000002.dat"
 # testfile = "/home/isaac/corsika_data/unattenuated_30degree_sealevel/iact_s_000001.dat"
-testfile = "iact_DAT000001.dat"
+# testfile = "iact_DAT000001.dat"
 
 ei = eventio.IACTFile(testfile)
 ei._next_header_pos = 0
@@ -52,7 +53,19 @@ event = next(iter(ei))
 
 for i in [0,5,10,15,20,25,30]:
     plt.figure()
-    plt.scatter(event.photon_bunches[i]['x'],event.photon_bunches[i]['y'],s = .1, label='iact')
-    plt.scatter(event_test.photon_bunches[i]['x'],event_test.photon_bunches[i]['y'],s = .1, label='chasm')
-    plt.title(f'Counter {i}')
+    size = 100*event.photon_bunches[i]['photons']/np.max(event.photon_bunches[i]['photons'])
+    sizec = 100*event_test.photon_bunches[i]['photons']/np.max(event.photon_bunches[i]['photons'])
+    plt.scatter(event.photon_bunches[i]['x'],event.photon_bunches[i]['y'],s = size, label='IACT',c='k')
+    plt.scatter(event_test.photon_bunches[i]['x'],event_test.photon_bunches[i]['y'],s = sizec, label='CHASM',c='r')
+    x = ei.telescope_positions[i][0]
+    y = ei.telescope_positions[i][1]
+    z = ei.telescope_positions[i][2]
+    r = np.sqrt(x**2+y**2+z**2) / 100
+    plt.suptitle('Photon Bunch Arrival Locations Relative to Shadow Center')
+    plt.title(f'Counter {r:.1f} (m) from Shower Core')
+    ax = plt.gca()
+    ax.set_aspect('equal')
+    plt.grid()
+    plt.xlabel('x (cm)')
+    plt.ylabel('y (cm)')
     plt.legend()
