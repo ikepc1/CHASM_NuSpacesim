@@ -532,7 +532,6 @@ class ShowerSimulation:
             photons_array = signal.calculate_ng()
         times_array = self.axis.get_timing(self.counters).counter_time()
         cq = self.counters.cos_Q(self.axis.vectors)
-        print(cq.shape)
         return ShowerSignal(self.counters, 
                             self.axis,
                             self.shower,
