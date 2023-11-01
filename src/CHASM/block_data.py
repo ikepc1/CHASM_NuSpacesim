@@ -327,17 +327,18 @@ def make_longitudinal(sig: ShowerSignal) -> LongitudinalData:
     '''This function extracts the shower profile and total Cherenkov to include in the
     mock longitudinal data block.
     '''
-    X = sig.depths
+    X = sig.axis.X
+    charged_particles = sig.shower.profile(X)
     N_thick = int(np.floor(X.max()))
     Xs = np.arange(N_thick)
 
     #depending on upward vs downward axis, the depths will increasing or decreasing
     #respectively. Numpy interp needs strictly increasing x values.
     if np.all(np.diff(X) > 0.):
-        nch_1g = np.interp(Xs,X,sig.charged_particles).tolist()
+        nch_1g = np.interp(Xs,X,charged_particles).tolist()
         ng_1g = np.interp(Xs,X,sig.total_photons).tolist()
     else:
-        nch_1g = np.interp(Xs,X[::-1],sig.charged_particles[::-1]).tolist()
+        nch_1g = np.interp(Xs,X[::-1],charged_particles[::-1]).tolist()
         ng_1g = np.interp(Xs,X[::-1],sig.total_photons[::-1]).tolist()
     n_g = [Float(val) for val in ng_1g]
     N_ch = [Float(val) for val in nch_1g]

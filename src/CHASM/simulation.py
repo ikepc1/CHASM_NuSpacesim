@@ -296,6 +296,7 @@ class ShowerSignal:
     '''
     counters: Counters #counters object
     axis: Axis #axis object
+    shower: Shower #shower object
     source_points: np.ndarray = field(repr=False) #vectors to axis points
     wavelengths: np.ndarray = field(repr=False) #wavelength of each bin, shape = (N_wavelengths)
     photons: np.ndarray = field(repr=False) #number of photons from each step to each counter, shape = (N_counters, N_wavelengths, N_axis_points)
@@ -473,6 +474,8 @@ class ShowerSimulation:
         photons_array = np.empty((self.N_c, len(self.y), len(self.lX_intervals), N_axis_points))
         cQ_array = np.empty((self.N_c, len(self.y), len(self.lX_intervals), N_axis_points))
         times_array = np.empty((self.N_c, len(self.lX_intervals), N_axis_points))
+        charged_particle_array = np.empty((len(self.lX_intervals), N_axis_points))
+        depth_array = np.empty_like(charged_particle_array)
 
         #calculate signal at each mesh ring
         for i, lX in enumerate(self.lX_intervals):
@@ -489,6 +492,10 @@ class ShowerSimulation:
 
             times_array[:,i] = meshaxis.get_timing(self.counters).counter_time()
             cQ_array[:,:,i] = self.counters.cos_Q(meshaxis.vectors)[:,np.newaxis,:]
+
+            #also save profile info for charged particles distributed into the rings
+            charged_particle_array[i] = meshaxis.nch
+            depth_array[i] = meshaxis.meshX
         
         #sum photons at each depth step
         tot_at_X = photons_array.sum(axis=2).sum(axis=1).sum(axis=0).reshape(self.axis.r.size,-1).sum(axis=1)
@@ -498,17 +505,20 @@ class ShowerSimulation:
         cQ_array = cQ_array.reshape((photons_array.shape[0],photons_array.shape[1],-1))
         times_array = times_array.reshape((times_array.shape[0],-1))
         axis_vectors = axis_vectors.reshape((-1,3))    
+        charged_particle_array = charged_particle_array.flatten()
+        depth_array = depth_array.flatten()
         
         return ShowerSignal(self.counters, 
                             self.axis,
+                            self.shower,
                             axis_vectors, 
                             np.array([y.l_mid for y in self.y]),
                             photons_array,
                             times_array,
-                            self.shower.profile(self.axis.X),
-                            self.axis.X,
+                            charged_particle_array,
+                            depth_array,
                             tot_at_X,
-                            cQ_array)
+                            cQ_array[:,0,:]) #just take the first wavelength entry, the angles are the same for all
 
     def get_signal(self, att: bool) -> ShowerSignal:
         '''This method returns a ShowerSignal object with the photons calculated
@@ -522,8 +532,10 @@ class ShowerSimulation:
             photons_array = signal.calculate_ng()
         times_array = self.axis.get_timing(self.counters).counter_time()
         cq = self.counters.cos_Q(self.axis.vectors)
+        print(cq.shape)
         return ShowerSignal(self.counters, 
                             self.axis,
+                            self.shower,
                             self.axis.vectors, 
                             np.array([y.l_mid for y in self.y]),
                             photons_array,
@@ -556,6 +568,7 @@ def signal_to_astropy(sig: ShowerSignal) -> QTable:
     for i in range(sig.photons.shape[0]):
         column_list.append(Column(sig.photons[i].T, name=f'counter {i} photons',unit=u.ct))
         column_list.append(Column(sig.times[i].T, name=f'counter {i} arrival times',unit=u.nanosecond))
+        column_list.append(Column(sig.cos_theta[i].T, name=f'counter {i} cos zenith',unit=u.rad))
     return QTable(column_list)
 
     # def run(self, mesh: bool = False, att: bool = False):
