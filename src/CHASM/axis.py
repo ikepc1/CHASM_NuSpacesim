@@ -730,6 +730,7 @@ class MeshAxis(Axis):
                                                                             self.linear_axis, 
                                                                             self.shower,
                                                                             N_ring=self.config.N_IN_RING)
+        self.meshX = np.repeat(self.X,self.config.N_IN_RING)
         self.rotated_mesh = rotate_mesh(mesh, linear_axis.zenith, linear_axis.azimuth)
 
     @property
