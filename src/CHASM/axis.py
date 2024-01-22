@@ -5,7 +5,8 @@ from abc import ABC, abstractmethod
 from importlib.resources import as_file, files
 from scipy.constants import value,nano
 from scipy.spatial.transform import Rotation as R
-from scipy.integrate import cumtrapz, quad
+from scipy.integrate import quad
+from functools import cached_property
 # from scipy.stats import norm
 
 from .atmosphere import Atmosphere
@@ -855,7 +856,7 @@ class MakeUpwardAxis(Axis):
     '''This is the implementation of an axis for an upward going shower, depths
     are added along the axis in the upward direction'''
 
-    @property
+    @cached_property
     def X(self) -> np.ndarray:
         '''This method sets the depth attribute'''
         # rho = self.atm.density(self.altitude)
@@ -884,6 +885,7 @@ class MakeUpwardAxis(Axis):
         '''
         ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
         self.altitude = self.altitude[np.argmax(ids):]
+        self.X = self.X[np.argmax(ids):]
 
 class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
     '''This is the implementation of an upward going shower axis with a flat
@@ -955,7 +957,7 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
 
-    @property
+    @cached_property
     def X(self) -> np.ndarray:
         '''This method sets the depth attribute, depths are added along the axis
         in the downward direction'''
@@ -986,6 +988,8 @@ class MakeDownwardAxis(Axis):
         ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
         a = self.altitude[::-1]
         self.altitude = a[np.argmax(ids[::-1]):][::-1]
+        x = self.X[::-1]
+        self.X = x[np.argmax(ids[::-1]):][::-1]
         # self.altitude = self.altitude[ids]
 
 class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
