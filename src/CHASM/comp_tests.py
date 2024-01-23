@@ -4,6 +4,10 @@ import CHASM as ch
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
+from astropy.table import QTable, Table, Column
+from astropy import units as u
+from dataclasses import dataclass, field, asdict
+
 plt.ion()
 
 testfile = "/home/isaac/corsika_data/phi_45_degrees/iact_DAT000002.dat"
@@ -30,9 +34,9 @@ sim.add(ch.UserShower(cors_no_att.X, cors_no_att.nch)) #profiles could also be c
 sim.add(ch.SphericalCounters(cors_no_att.counter_vectors, cors_no_att.counter_radius))
 
 #Add wavelength interval for Cherenkov yield calculation
-sim.add(ch.Yield(cors_no_att.min_l, cors_no_att.max_l,3))
+sim.add(ch.Yield(cors_no_att.min_l, cors_no_att.max_l,4))
 
-sig = sim.run(mesh = False)
+sig = sim.run(mesh = True)
 
 # b = ch.eventio_bytes(sig)
 ch.write_ei_file(sig, 'test.dat')
