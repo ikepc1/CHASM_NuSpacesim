@@ -306,10 +306,10 @@ class ShowerSignal:
     total_photons: np.ndarray = field(repr=False)
     cos_theta: np.ndarray = field(repr=False)
 
-    def __post_init__(self) -> None:
+    # def __post_init__(self) -> None:
         # self.x, self.y, self.cx, self.cy = x_y_cx_cy(self.source_points, self.counters)
-        self.x, self.y = self.rand_xy()
-        self.cx, self.cy = self.cx_cy()
+        # self.x, self.y = self.rand_xy()
+        # self.cx, self.cy = self.cx_cy()
 
     def rand_xy(self) -> tuple[np.ndarray]:
         '''This method generates a random x and y in the ellipse made by the 
@@ -348,6 +348,8 @@ class ShowerSignal:
         number of photons in the bunch, and wavelength.
         The returned array is of shape (N_axis_points*N_wavelengths,8)
         '''
+        self.x, self.y = self.rand_xy()
+        self.cx, self.cy = self.cx_cy()
         photons = self.photons[tel_id]
         filter_mask = photons.sum(axis=0) > 1.e-5
         photons = photons[:,filter_mask]
