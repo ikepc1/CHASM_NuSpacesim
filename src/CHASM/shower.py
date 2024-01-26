@@ -162,4 +162,4 @@ class MakeUserShower(Shower):
         Returns:
             N: the shower size
         """
-        return np.interp(X, self.input_X, self.input_Nch)
+        return np.interp(X, self.input_X, self.input_Nch, left = 0., right = 0.)
