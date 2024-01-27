@@ -34,6 +34,14 @@ def signal_from_ingredients(shower:str,axis:str,counters:str,cyield:str,request)
     y = request.getfixturevalue(cyield)
     return ch.Signal(s,a,c,y)
 
+def signal_from_ingredients(shower:str,axis:str,counters:str,cyield:str,request):
+    '''This function creaates a basic signal from the fixture names'''
+    s = request.getfixturevalue(shower)
+    a = request.getfixturevalue(axis)
+    c = request.getfixturevalue(counters)
+    y = request.getfixturevalue(cyield)
+    return ch.Signal(s,a,c,y)
+
 def meshsignal_from_ingredients(shower:str,axis:str,counters:str,cyield:str,request):
     '''This function creaates a basic signal from the fixture names'''
     linear_shower = request.getfixturevalue(shower)
@@ -50,148 +58,48 @@ def signal_checks(signal: ch.Signal):
     assert np.size(ng[np.isnan(ng)]) == 0
     assert np.size(ng[ng < 0.]) == 0
 
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_downward_fp_axis","sample_downward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_ground_array","sample_flat_ground_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_downward_shower_signal(shower,axis,counters,cyield,request):
-    '''This test creates a signal for a downward shower with flat planar atm and
-    the various counters.
+def showersignal_checks(sig: ch.ShowerSignal):
+    arrs2check =   [sig.source_points,
+                    sig.wavelengths,
+                    sig.photons,
+                    sig.times,
+                    sig.charged_particles,
+                    sig.depths,
+                    sig.total_photons,
+                    sig.cos_theta]
+    for arr in arrs2check:
+        assert np.isnan(arr).any() == False
+
+def sim_from_inputs(shower_input:str,axis_input:str,counters_input:str,cyield_input:str,request):
+    sim = ch.ShowerSimulation()
+    sim.add(request.getfixturevalue(shower_input))
+    sim.add(request.getfixturevalue(axis_input))
+    sim.add(request.getfixturevalue(counters_input))
+    sim.add(request.getfixturevalue(cyield_input))
+    return sim
+
+@pytest.mark.parametrize("shower",["sample_GH_shower_input","sample_user_shower_input"])
+@pytest.mark.parametrize("axis",["sample_downward_fp_axis_input","sample_downward_curved_axis_input"])
+@pytest.mark.parametrize("counters",["sample_spherical_ground_array_input","sample_flat_ground_array_input"])
+@pytest.mark.parametrize("cyield",["sample_yield_input"])
+@pytest.mark.parametrize("mesh",[True, False])
+@pytest.mark.parametrize("att",[True, False])
+def test_downward_run(shower,axis,counters,cyield,mesh,att,request):
+    '''This test creates a sim for a downward shower, runs it, and checks the output.
     '''
-    signal_checks(signal_from_ingredients(shower,axis,counters,cyield,request))
+    sim = sim_from_inputs(shower,axis,counters,cyield,request)
+    sig = sim.run(mesh=mesh,att=att)
+    showersignal_checks(sig)
 
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_downward_fp_axis","sample_downward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_ground_array","sample_flat_ground_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_downward_mesh_shower_signal(shower,axis,counters,cyield,request):
-    '''This test creates a signal for a downward shower with flat planar atm and
-    the various counters.
+@pytest.mark.parametrize("shower",["sample_GH_shower_input","sample_user_shower_input"])
+@pytest.mark.parametrize("axis",["sample_upward_fp_axis_input","sample_upward_curved_axis_input"])
+@pytest.mark.parametrize("counters",["sample_spherical_orbital_array_input","sample_flat_orbital_array_input"])
+@pytest.mark.parametrize("cyield",["sample_yield_input"])
+@pytest.mark.parametrize("mesh",[True, False])
+@pytest.mark.parametrize("att",[True, False])
+def test_upward_run(shower,axis,counters,cyield,mesh,att,request):
+    '''This test creates a sim for a downward shower, runs it, and checks the output.
     '''
-    signal_checks(meshsignal_from_ingredients(shower,axis,counters,cyield,request))
-
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_upward_fp_axis","sample_upward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_orbital_array","sample_flat_orbital_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_upward_shower_signal(shower,axis,counters,cyield,request):
-    '''This test creates a signal for a downward shower with flat planar atm and
-    the various counters.
-    '''
-    signal_checks(signal_from_ingredients(shower,axis,counters,cyield,request))
-
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_upward_fp_axis","sample_upward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_orbital_array","sample_flat_orbital_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_upward_mesh_shower_signal(shower,axis,counters,cyield,request):
-    '''This test creates a signal for a downward shower with flat planar atm and
-    the various counters.
-    '''
-    signal_checks(meshsignal_from_ingredients(shower,axis,counters,cyield,request))
-
-def timing_from_ingredients(axis: str, counters: str, request):
-    '''This function creates a timing object from the fixture names.'''
-    a = request.getfixturevalue(axis)
-    c = request.getfixturevalue(counters)
-    return a.get_timing(c)
-
-def mesh_timing_from_ingredients(shower: str, axis: str, counters: str, request):
-    '''This function creates a mesh timing object from the fixture names.'''
-    linear_shower = request.getfixturevalue(shower)
-    linear_axis = request.getfixturevalue(axis)
-    a = ch.MeshAxis((-6.,0.),linear_axis,linear_shower)
-    s = ch.MeshShower(a)
-    c = request.getfixturevalue(counters)
-    return a.get_timing(c)
-
-def timing_checks(timing: ch.Timing):
-    '''This function performs the check on a Timing object.'''
-    t = timing.counter_time()
-    assert np.size(t[np.isnan(t)]) == 0
-
-@pytest.mark.parametrize("axis",["sample_downward_fp_axis","sample_downward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_ground_array","sample_flat_ground_array"])
-def test_downward_timing(axis, counters, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    timing_checks(timing_from_ingredients(axis, counters, request))
-
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_downward_fp_axis","sample_downward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_ground_array","sample_flat_ground_array"])
-def test_downward_mesh_timing(shower, axis, counters, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    timing_checks(mesh_timing_from_ingredients(shower, axis, counters, request))
-
-@pytest.mark.parametrize("axis",["sample_upward_fp_axis","sample_upward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_orbital_array","sample_flat_orbital_array"])
-def test_upward_timing(axis, counters, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    timing_checks(timing_from_ingredients(axis, counters, request))
-
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_upward_fp_axis","sample_upward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_orbital_array","sample_flat_orbital_array"])
-def test_upward_mesh_timing(shower, axis, counters, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    timing_checks(mesh_timing_from_ingredients(shower, axis, counters, request))
-
-def attenuation_from_ingredients(axis: str, counters: str, cyield:str, request):
-    '''This function creates an attenuation object from the fixture names.'''
-    a = request.getfixturevalue(axis)
-    c = request.getfixturevalue(counters)
-    y = request.getfixturevalue(cyield)
-    return a.get_attenuation(c, y)
-
-def mesh_attenuation_from_ingredients(shower: str, axis: str, counters: str, cyield:str, request):
-    '''This function creates a mesh attenuation object from the fixture names.'''
-    linear_shower = request.getfixturevalue(shower)
-    linear_axis = request.getfixturevalue(axis)
-    a = ch.MeshAxis((-6.,0.),linear_axis,linear_shower)
-    s = ch.MeshShower(a)
-    c = request.getfixturevalue(counters)
-    y = request.getfixturevalue(cyield)
-    return a.get_attenuation(c, y)
-
-def attenuation_checks(attenuation: ch.Attenuation):
-    '''This function performs the check on an attenuation object.'''
-    f = attenuation.fraction_passed()[0]
-    assert np.size(f[np.isnan(f)]) == 0
-
-@pytest.mark.parametrize("axis",["sample_downward_fp_axis","sample_downward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_ground_array","sample_flat_ground_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_downward_attenuation(axis, counters, cyield, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    attenuation_checks(attenuation_from_ingredients(axis, counters, cyield, request))
-
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_downward_fp_axis","sample_downward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_ground_array","sample_flat_ground_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_downward_mesh_attenuation(shower, axis, counters, cyield, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    attenuation_checks(mesh_attenuation_from_ingredients(shower, axis, counters, cyield, request))
-
-@pytest.mark.parametrize("axis",["sample_upward_fp_axis","sample_upward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_orbital_array","sample_flat_orbital_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_upward_attenuation(axis, counters, cyield, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    attenuation_checks(attenuation_from_ingredients(axis, counters, cyield, request))
-
-@pytest.mark.parametrize("shower",["sample_GH_shower","sample_user_shower"])
-@pytest.mark.parametrize("axis",["sample_upward_fp_axis","sample_upward_curved_axis"])
-@pytest.mark.parametrize("counters",["sample_spherical_orbital_array","sample_flat_orbital_array"])
-@pytest.mark.parametrize("cyield",["sample_yield"])
-def test_upward_mesh_attenuation(shower, axis, counters, cyield, request):
-    '''This test creates the various possibilities for an upward timing object
-    and performs the checks in timing_checks().'''
-    attenuation_checks(mesh_attenuation_from_ingredients(shower, axis, counters, cyield, request))
+    sim = sim_from_inputs(shower,axis,counters,cyield,request)
+    sig = sim.run(mesh=mesh,att=att)
+    showersignal_checks(sig)

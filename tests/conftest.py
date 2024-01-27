@@ -15,6 +15,10 @@ def sample_GH_params():
     }
 
 @pytest.fixture
+def sample_GH_shower_input(sample_GH_params):
+    return ch.GHShower(*sample_GH_params.values())
+
+@pytest.fixture
 def sample_GH_shower(sample_GH_params):
     '''Return an instantiated GH shower object.'''
     return ch.MakeGHShower(*sample_GH_params.values())
@@ -30,6 +34,10 @@ def sample_usershower_params():
     }
 
 @pytest.fixture
+def sample_user_shower_input(sample_usershower_params):
+    return ch.UserShower(*sample_usershower_params.values())
+
+@pytest.fixture
 def sample_user_shower(sample_usershower_params):
     '''Return an instantiated User shower object.'''
     return ch.MakeUserShower(*sample_usershower_params.values())
@@ -43,6 +51,16 @@ def sample_downward_axis_params():
     'ground_level':0.
     }
 
+@pytest.fixture
+def sample_downward_fp_axis_input(sample_downward_axis_params):
+    '''Return instantiated downward axis with fp atm axis.'''
+    return ch.DownwardAxis(*sample_downward_axis_params.values())
+
+@pytest.fixture
+def sample_downward_curved_axis_input(sample_downward_axis_params):
+    '''Return instantiated downward axis with curved atm axis.'''
+    
+    return ch.DownwardAxis(*sample_downward_axis_params.values(),curved=True)
 
 @pytest.fixture
 def sample_downward_fp_axis(sample_downward_axis_params):
@@ -63,6 +81,16 @@ def sample_upward_axis_params():
     'azimuth':np.radians(0.),
     'ground_level':0.
     }
+
+@pytest.fixture
+def sample_upward_fp_axis_input(sample_upward_axis_params):
+    '''Returns instantiated upward axis with fp atm.'''
+    return ch.UpwardAxis(*sample_upward_axis_params.values())
+
+@pytest.fixture
+def sample_upward_curved_axis_input(sample_upward_axis_params):
+    '''Returns instantiated upward axis with curved atm.'''
+    return ch.UpwardAxis(*sample_upward_axis_params.values(),curved=True)
 
 @pytest.fixture
 def sample_upward_fp_axis(sample_upward_axis_params):
@@ -87,6 +115,16 @@ def sample_ground_array_geometry():
     'vectors':counters,
     'radius':1.
     }
+
+@pytest.fixture
+def sample_spherical_ground_array_input(sample_ground_array_geometry):
+    '''Returns instantiated spherical ground array.'''
+    return ch.SphericalCounters(*sample_ground_array_geometry.values())
+
+@pytest.fixture
+def sample_flat_ground_array_input(sample_ground_array_geometry):
+    '''Returns instantiated flat ground array.'''
+    return ch.FlatCounters(*sample_ground_array_geometry.values())
 
 @pytest.fixture
 def sample_spherical_ground_array(sample_ground_array_geometry):
@@ -122,6 +160,16 @@ def sample_orbital_array_geometry():
     }
 
 @pytest.fixture
+def sample_spherical_orbital_array_input(sample_orbital_array_geometry):
+    '''Returns instantiated spherical ground array.'''
+    return ch.SphericalCounters(*sample_orbital_array_geometry.values())
+
+@pytest.fixture
+def sample_flat_orbital_array_input(sample_orbital_array_geometry):
+    '''Returns instantiated flat ground array.'''
+    return ch.FlatCounters(*sample_orbital_array_geometry.values())
+
+@pytest.fixture
 def sample_spherical_orbital_array(sample_orbital_array_geometry):
     '''Returns instantiated spherical ground array.'''
     return ch.MakeSphericalCounters(*sample_orbital_array_geometry.values())
@@ -138,6 +186,11 @@ def sample_yield_interval():
     'min_l':300,
     'max_l':900,
     }
+
+@pytest.fixture
+def sample_yield_input(sample_yield_interval):
+    '''Returns list with an instantiated yield object.'''
+    return ch.Yield(*sample_yield_interval.values())
 
 @pytest.fixture
 def sample_yield(sample_yield_interval):
