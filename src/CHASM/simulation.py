@@ -6,7 +6,7 @@ from astropy import units as u
 from dataclasses import dataclass, field, asdict
 
 from .shower import Shower
-from .axis import Axis, Counters, MeshAxis, MeshShower, Timing, Attenuation, MakeSphericalCounters
+from .axis import Axis, Counters, MeshAxis, MeshShower, Timing, Attenuation, MakeSphericalCounters, CurvedAtmCorrection
 from .generate_Cherenkov import MakeYield
 from .cherenkov_photon_array import CherenkovPhotonArray
 
@@ -451,7 +451,7 @@ class ShowerSimulation:
         return self.axis.config.N_IN_RING * self.axis.r.size * len(self.lX_intervals)
 
     @staticmethod
-    def get_attenuated_photons_array(signal: Signal):
+    def get_attenuated_photons_array(signal: Signal, curved_correction: CurvedAtmCorrection):
         '''This method returns the attenuated number of photons going from each
         step to each counter.
 
@@ -459,7 +459,7 @@ class ShowerSimulation:
         # of yield bins, with each entry being on size:
         (# of counters, # of axis points)
         '''
-        attenuation = signal.axis.get_attenuation(signal.counters,signal.yield_array)
+        attenuation = signal.axis.get_attenuation(curved_correction,signal.yield_array)
         fraction_array = attenuation.fraction_passed()
         photons_array = signal.calculate_ng()
         attenuated_photons = np.zeros_like(photons_array)
@@ -484,16 +484,17 @@ class ShowerSimulation:
             meshaxis = MeshAxis(lX, self.axis, self.shower)
             meshshower = MeshShower(meshaxis)
             signal = Signal(meshshower,meshaxis,self.counters,self.y)
+            curved_correction = meshaxis.get_curved_atm_correction(self.counters)
 
             axis_vectors[i,:] = meshaxis.vectors
 
             if att:
-                photons_array[:,:,i] = self.get_attenuated_photons_array(signal)
+                photons_array[:,:,i] = self.get_attenuated_photons_array(signal, curved_correction)
             else:
                 photons_array[:,:,i] = signal.calculate_ng()
 
-            times_array[:,i] = meshaxis.get_timing(self.counters).counter_time()
-            cQ_array[:,:,i] = self.counters.cos_Q(meshaxis.vectors)[:,np.newaxis,:]
+            times_array[:,i] = meshaxis.get_timing(curved_correction).counter_time()
+            cQ_array[:,:,i] = curved_correction.cQ[:,np.newaxis,:]
 
             #also save profile info for charged particles distributed into the rings
             charged_particle_array[i] = meshaxis.nch
@@ -527,13 +528,14 @@ class ShowerSimulation:
         along the axis.
         '''
         signal = Signal(self.shower,self.axis,self.counters,self.y)
+        curved_correction = self.axis.get_curved_atm_correction(self.counters)
 
         if att:
-            photons_array = self.get_attenuated_photons_array(signal)
+            photons_array = self.get_attenuated_photons_array(signal, curved_correction)
         else:
             photons_array = signal.calculate_ng()
-        times_array = self.axis.get_timing(self.counters).counter_time()
-        cq = self.counters.cos_Q(self.axis.vectors)
+        times_array = self.axis.get_timing(curved_correction).counter_time()
+        cq = curved_correction.cQ
         return ShowerSignal(self.counters, 
                             self.axis,
                             self.shower,

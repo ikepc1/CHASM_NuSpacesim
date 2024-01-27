@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Any, Protocol
 from functools import cached_property
 import numpy as np
 from abc import ABC, abstractmethod
@@ -324,6 +324,20 @@ class Attenuation(ABC):
         (# of counters, # of axis points)
         '''
 
+class CurvedAtmCorrection(ABC):
+    '''This is the abstract base class for performing a curved atmosphere
+    correction.
+    '''
+
+    @abstractmethod
+    def curved_correction(self, vert: np.ndarray) -> np.ndarray:
+        '''This method ahould perform the integration of the quantity vert
+        for either an upward or downward axis.
+        '''
+
+    def __call__(self, vert: np.ndarray) -> np.ndarray:
+        return self.curved_correction(vert)
+
 class AxisParams(Protocol):
     '''This is the protocol for an axis parameter container.
     '''
@@ -499,15 +513,18 @@ class Axis(ABC):
         axis'''
         return np.interp(r, self.r, self.X)
 
-    def get_timing(self, counters: Counters) -> Timing:
+    def get_timing(self, curved_correction: CurvedAtmCorrection) -> Timing:
         '''This function returns an instantiated timing object appropriate for
         the axis implementation.'''
-        return self.get_timing_class()(self, counters)
+        return self.get_timing_class()(curved_correction)
 
-    def get_attenuation(self, counters: Counters, y: list[MakeYield]) -> Attenuation:
+    def get_attenuation(self, curved_correction: CurvedAtmCorrection, y: list[MakeYield]) -> Attenuation:
         '''This function returns an instantiated attenuation object appropriate for
         the axis implementation.'''
-        return self.get_attenuation_class()(self, counters, y)
+        return self.get_attenuation_class()(curved_correction, y)
+    
+    def get_curved_atm_correction(self, counters: Counters) -> CurvedAtmCorrection:
+        return self.get_curved_atm_correction_class()(self, counters)
 
     @property
     @abstractmethod
@@ -560,6 +577,12 @@ class Axis(ABC):
         '''This method re-defines the height attribute depending on where the shower 
         falls along the axis. The purpose of this is to avoid running expensive 
         calculations where no significant amount of particles exist.
+        '''
+
+    @abstractmethod
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        '''This method returns the curved atm correction class for the speccific axis 
+        implementation.
         '''
 
 class MakeSphericalCounters(Counters):
@@ -832,6 +855,9 @@ class MeshAxis(Axis):
 
     def reset_for_profile(self, shower: Shower) -> None:
         return self.linear_axis.reset_for_profile(shower)
+    
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        return self.linear_axis.get_curved_atm_correction_class()
 
 class MeshShower(Shower):
     '''This class is the implementation of a shower where the shower particles are
@@ -918,6 +944,9 @@ class MakeUpwardAxisFlatPlanarAtm(MakeUpwardAxis):
         '''This method returns the original gg array file.
         '''
         return 'gg_t_delta_theta_mc.npz'
+    
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        return NoCurvedCorrection
 
 class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
     '''This is the implementation of an upward going shower axis with a flat
@@ -953,6 +982,9 @@ class MakeUpwardAxisCurvedAtm(MakeUpwardAxis):
         '''This method returns the original gg array file.
         '''
         return 'gg_t_delta_theta_mc.npz'
+    
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        return UpwardCurvedCorrection
 
 class MakeDownwardAxis(Axis):
     '''This is the implementation of an axis for a downward going shower'''
@@ -1025,6 +1057,9 @@ class MakeDownwardAxisFlatPlanarAtm(MakeDownwardAxis):
         '''
         return 'gg_t_delta_theta_mc.npz'
         # return 'gg_t_delta_theta_lX_-2_to_-1.npz'
+    
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        return NoCurvedCorrection
 
 class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
     '''This is the implementation of a downward going shower axis with a
@@ -1061,6 +1096,72 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
         '''This method returns the original gg array file.
         '''
         return 'gg_t_delta_theta_mc.npz'
+    
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        return DownwardCurvedCorrection
+
+class DownwardCurvedCorrection(CurvedAtmCorrection):
+    '''This is the implementation of the curved atmosphere integration for
+    downward going showers.
+    '''
+    def __init__(self, axis: MakeDownwardAxisCurvedAtm, counters: Counters) -> None:
+        self.axis = axis
+        self.counters = counters
+        self.cQ = counters.cos_Q(axis.vectors)
+        self.cQd = np.cos(axis.theta_difference)
+        self.sQd = np.sin(axis.theta_difference)
+        self.Q = np.arccos(self.cQ)
+
+    def curved_correction(self, vert: np.ndarray) -> np.ndarray:
+        '''This is the integration.
+        '''
+        integrals = np.empty_like(self.Q)
+        for i in range(integrals.shape[1]):
+            test_Q = np.linspace(self.Q[:,i].min(), self.Q[:,i].max(), 5)
+            test_cQ = np.cos(test_Q)
+            test_sQ = np.sin(test_Q)
+            t1 = test_cQ[:,np.newaxis] * self.cQd[:i] #these next three lines are what's different for up vs down
+            t2 = test_sQ[:,np.newaxis] * self.sQd[:i]
+            test_integrals = np.sum(vert[:i] / (t1 + t2), axis = 1)
+            integrals[:,i] = np.interp(self.Q[:,i], test_Q, test_integrals)
+        return integrals
+    
+class UpwardCurvedCorrection(CurvedAtmCorrection):
+    '''This is the implementation of the curved atmosphere integration for
+    upward going showers.
+    '''
+    def __init__(self, axis: MakeUpwardAxisCurvedAtm, counters: Counters) -> None:
+        self.axis = axis
+        self.counters = counters
+        self.cQ = counters.cos_Q(axis.vectors)
+        self.cQd = np.cos(axis.theta_difference)
+        self.sQd = np.sin(axis.theta_difference)
+        self.Q = np.arccos(self.cQ)
+
+    def curved_correction(self, vert: np.ndarray) -> np.ndarray:
+        '''This is the integration.
+        '''
+        integrals = np.empty_like(self.Q)
+        for i in range(integrals.shape[1]):
+            test_Q = np.linspace(self.Q[:,i].min(), self.Q[:,i].max(), 5)
+            test_cQ = np.cos(test_Q)
+            test_sQ = np.sin(test_Q)
+            t1 = test_cQ[:,np.newaxis] * self.cQd[i:] #these two lines are what's different for up vs down
+            t2 = test_sQ[:,np.newaxis] * self.sQd[i:]
+            test_integrals = np.sum(vert[i:] / (t1 + t2), axis = 1)
+            integrals[:,i] = np.interp(self.Q[:,i], test_Q, test_integrals)
+        return integrals
+
+class NoCurvedCorrection(CurvedAtmCorrection):
+    '''This class is does nothing but pass the axis and counters object.
+    '''
+    def __init__(self, axis: Axis, counters: Counters) -> None:
+        self.axis = axis
+        self.counters = counters
+        self.cQ = counters.cos_Q(axis.vectors)
+
+    def curved_correction(self, vert: np.ndarray) -> None:
+        pass
 
 def downward_curved_correction(axis: MakeDownwardAxisCurvedAtm, counters: Counters, vert: np.ndarray) -> np.ndarray:
     '''This function divides some quantity specified at each atmospheric height
@@ -1137,9 +1238,10 @@ class DownwardTiming(Timing):
     correction for atmospheric curveature
     '''
 
-    def __init__(self, axis: MakeDownwardAxisFlatPlanarAtm, counters: Counters):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: NoCurvedCorrection):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         # self.counter_time = self.counter_time()
 
     def __repr__(self):
@@ -1166,16 +1268,17 @@ class DownwardTiming(Timing):
     def delay(self) -> np.ndarray:
         '''This is the implementation of the delay property
         '''
-        return self.vertical_delay() / self.counters.cos_Q(self.axis.vectors)
+        return self.vertical_delay() / self.curved_correction.cQ#self.counters.cos_Q(self.axis.vectors)
 
 class DownwardTimingCurved(Timing):
     '''This is the implementation of timing for a downward shower using a curved
     athmosphere, this will be useful for showers with a relatively high zenith
     angle'''
 
-    def __init__(self, axis: MakeDownwardAxisCurvedAtm, counters: Counters):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: DownwardCurvedCorrection):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         # self.counter_time = self.counter_time()
 
     def __repr__(self):
@@ -1199,16 +1302,18 @@ class DownwardTimingCurved(Timing):
         shape: (# of counters, # of axis points)
         '''
         vsd = self.axis.delta * self.axis.dh / self.c / nano #vertical stage delay
-        return downward_curved_correction(self.axis, self.counters, vsd)
+        # return downward_curved_correction(self.axis, self.counters, vsd)
+        return self.curved_correction(vsd)
 
 class UpwardTiming(Timing):
     '''This is the implementation of timing for a upward going shower with no
     correction for atmospheric curveature
     '''
 
-    def __init__(self, axis: MakeUpwardAxisFlatPlanarAtm, counters: Counters):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: NoCurvedCorrection):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         # self.counter_time = self.counter_time()
 
     def __repr__(self):
@@ -1235,16 +1340,17 @@ class UpwardTiming(Timing):
     def delay(self) -> np.ndarray:
         '''This is the implementation of the delay property
         '''
-        return self.vertical_delay() / self.counters.cos_Q(self.axis.vectors)
+        return self.vertical_delay() / self.curved_correction.cQ#self.counters.cos_Q(self.axis.vectors)
 
 class UpwardTimingCurved(Timing):
     '''This is the implementation of timing for a upward going shower with
     correction for atmospheric curveature.
     '''
 
-    def __init__(self, axis: MakeUpwardAxisCurvedAtm, counters: Counters):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: UpwardCurvedCorrection):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         # self.counter_time = self.counter_time()
 
     def __repr__(self):
@@ -1268,16 +1374,18 @@ class UpwardTimingCurved(Timing):
         shape: (# of counters, # of axis points)
         '''
         vsd = self.axis.delta * self.axis.dh / self.c / nano #vertical stage delay
-        return upward_curved_correction(self.axis, self.counters, vsd)
+        return self.curved_correction(vsd)
+        # return upward_curved_correction(self.axis, self.counters, vsd)
 
 class DownwardAttenuation(Attenuation):
     '''This is the implementation of signal attenuation for an downward going air
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeDownwardAxisFlatPlanarAtm, counters: Counters, yield_array: np.ndarray):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: NoCurvedCorrection, yield_array: np.ndarray):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         self.yield_array = yield_array
         self.atm = self.axis.atm
 
@@ -1292,9 +1400,9 @@ class DownwardAttenuation(Attenuation):
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
         log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
-        cQ = self.counters.cos_Q(self.axis.vectors)
+        # cQ = self.counters.cos_Q(self.axis.vectors)
         for i, v_log_frac in enumerate(vert_log_fraction_list):
-            log_frac_passed_list[i] = np.cumsum(v_log_frac / cQ, axis=1)
+            log_frac_passed_list[i] = np.cumsum(v_log_frac / self.curved_correction.cQ, axis=1)
         return log_frac_passed_list
 
 class DownwardAttenuationCurved(Attenuation):
@@ -1302,9 +1410,10 @@ class DownwardAttenuationCurved(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeDownwardAxisCurvedAtm, counters: Counters, yield_array: np.ndarray):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: DownwardCurvedCorrection, yield_array: np.ndarray):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         self.yield_array = yield_array
         self.atm = self.axis.atm
 
@@ -1320,7 +1429,8 @@ class DownwardAttenuationCurved(Attenuation):
         vert_log_fraction_list = self.vertical_log_fraction()
         log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
         for i, v_log_frac in enumerate(vert_log_fraction_list):
-            log_frac_passed_list[i] = downward_curved_correction(self.axis, self.counters, v_log_frac)
+            # log_frac_passed_list[i] = downward_curved_correction(self.axis, self.counters, v_log_frac)
+            log_frac_passed_list[i] = self.curved_correction(v_log_frac)
         return log_frac_passed_list
 
 class UpwardAttenuation(Attenuation):
@@ -1328,9 +1438,10 @@ class UpwardAttenuation(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxisFlatPlanarAtm, counters: Counters, yield_array: np.ndarray):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: NoCurvedCorrection, yield_array: np.ndarray):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         self.yield_array = yield_array
         self.atm = self.axis.atm
 
@@ -1344,9 +1455,9 @@ class UpwardAttenuation(Attenuation):
         '''
         vert_log_fraction_list = self.vertical_log_fraction()
         log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
-        cQ = self.counters.cos_Q(self.axis.vectors)
+        # cQ = self.counters.cos_Q(self.axis.vectors)
         for i, v_log_frac in enumerate(vert_log_fraction_list):
-            log_frac_passed_list[i] = np.cumsum((v_log_frac / cQ)[:,::-1], axis=1)[:,::-1]
+            log_frac_passed_list[i] = np.cumsum((v_log_frac / self.curved_correction.cQ)[:,::-1], axis=1)[:,::-1]
         return log_frac_passed_list
 
 class UpwardAttenuationCurved(Attenuation):
@@ -1354,9 +1465,10 @@ class UpwardAttenuationCurved(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, axis: MakeUpwardAxisCurvedAtm, counters: Counters, yield_array: np.ndarray):
-        self.axis = axis
-        self.counters = counters
+    def __init__(self, curved_correction: NoCurvedCorrection, yield_array: np.ndarray):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
         self.yield_array = yield_array
         self.atm = self.axis.atm
 
@@ -1372,5 +1484,6 @@ class UpwardAttenuationCurved(Attenuation):
         vert_log_fraction_list = self.vertical_log_fraction()
         log_frac_passed_list = np.empty_like(vert_log_fraction_list, dtype='O')
         for i, v_log_frac in enumerate(vert_log_fraction_list):
-            log_frac_passed_list[i] = upward_curved_correction(self.axis, self.counters, v_log_frac)
+            # log_frac_passed_list[i] = upward_curved_correction(self.axis, self.counters, v_log_frac)
+            log_frac_passed_list[i] = self.curved_correction(v_log_frac)
         return log_frac_passed_list
