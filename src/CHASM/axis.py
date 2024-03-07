@@ -993,15 +993,12 @@ class MakeDownwardAxis(Axis):
     def X(self) -> np.ndarray:
         '''This method sets the depth attribute, depths are added along the axis
         in the downward direction'''
-        # rho = self.atm.density(self.altitude)
-        # axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
-        # return np.concatenate((np.cumsum(axis_deltaX[::-1])[::-1],
-        #             np.array([0])))
-        depths = np.zeros_like(self.r)
-        A = self.altitude[:-1]
-        B = self.altitude[1:]
-        depths[:-1] = np.array([quad(self.slant_depth_integrand,a,b)[0] for a,b in zip(A,B)])
-        return np.cumsum(depths[::-1] / 10.)[::-1]
+        # depths = np.zeros_like(self.r)
+        # A = self.altitude[:-1]
+        # B = self.altitude[1:]
+        # depths[:-1] = np.array([quad(self.slant_depth_integrand,a,b)[0] for a,b in zip(A,B)])
+        # return np.cumsum(depths[::-1] / 10.)[::-1]
+        return -cumtrapz(self.slant_depth_integrand(self.altitude[::-1]) / 10.,self.altitude[::-1], initial=0)[::-1]
 
     def distance(self, X: np.ndarray) -> np.ndarray:
         '''This method is the distance along the axis as a function of depth'''

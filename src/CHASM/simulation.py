@@ -4,6 +4,7 @@ import numpy as np
 from astropy.table import QTable, Table, Column
 from astropy import units as u
 from dataclasses import dataclass, field, asdict
+from importlib.resources import as_file, files
 
 from .shower import Shower
 from .axis import Axis, Counters, MeshAxis, MeshShower, Timing, Attenuation, MakeSphericalCounters, CurvedAtmCorrection
@@ -169,11 +170,12 @@ class Signal:
     given counters
     '''
 
-    def __init__(self, shower: Shower, axis: Axis, counters: Counters, yield_array: list[MakeYield]):
+    def __init__(self, shower: Shower, axis: Axis, counters: Counters, yield_array: list[MakeYield], gg: CherenkovPhotonArray, y: dict[str,np.ndarray]):
         self.shower = shower
         self.axis = axis
-        self.table_file = axis.get_gg_file()
-        self.gga = CherenkovPhotonArray(self.table_file)
+        # self.table_file = axis.get_gg_file()
+        self.gga = gg
+        self.yield_file = y
         self.counters = counters
         self.yield_array = yield_array
         self.t = self.shower.stage(self.axis.X)
@@ -257,7 +259,7 @@ class Signal:
         gg = self.calculate_gg()
         ng_array = np.empty(self.photon_array_shape)
         for i, y in enumerate(self.yield_array):
-            y.set_yield_at_lX(self.axis.lX)
+            y.set_yield_attributes(self.yield_file)
             ng_array[:,i,:] = gg * self.calculate_yield(y) * self.omega
         return ng_array
 
@@ -377,6 +379,34 @@ class ShowerSimulation:
         'counters': None,
         'yield': None
         }
+        self.table_lXs = np.arange(-6,0)
+        self.table_lX_intervals = list(zip(self.table_lXs[:-1], self.table_lXs[1:]))
+        self.lX_mids = np.array([np.mean(interval) for interval in self.table_lX_intervals])
+        self.yield_files = {interval:self.load_table_file('y_t_delta_lX_', interval) for interval in self.table_lX_intervals}
+        self.ggs = {interval:CherenkovPhotonArray(self.load_table_file('gg_t_delta_theta_lX_', interval)) for interval in self.table_lX_intervals}
+        with as_file(files('CHASM.data')/'gg_t_delta_theta_mc.npz') as file:
+            self.linear_gg = CherenkovPhotonArray(np.load(file))
+        with as_file(files('CHASM.data')/'y_t_delta.npz') as file:
+            self.linear_y = np.load(file)
+
+    @staticmethod
+    def load_table_file(prefix: str, interval: tuple[int]) -> dict[str:np.ndarray]:
+        '''This method loads a table file from the data directory.
+        '''
+        filename = prefix + f'{interval[0]}_to_{interval[1]}.npz'
+        with as_file(files('CHASM.data')/filename) as file:
+            arraydict = np.load(file)
+        return arraydict
+
+    def find_nearest_interval(self, lX: float) -> tuple:
+        '''This method returns the start and end points of the lX interval that
+        the mesh falls within.
+        '''
+        index = np.searchsorted(self.table_lXs[:-1], lX)
+        if index == 0:
+            return self.table_lXs[0], self.table_lXs[1]
+        else:
+            return self.table_lXs[index-1], self.table_lXs[index]
 
     def add(self, element: Element):
         '''Add a element to the list of elements for the sim to perform'''
@@ -483,7 +513,10 @@ class ShowerSimulation:
         for i, lX in enumerate(self.lX_intervals):
             meshaxis = MeshAxis(lX, self.axis, self.shower)
             meshshower = MeshShower(meshaxis)
-            signal = Signal(meshshower,meshaxis,self.counters,self.y)
+            table_interval = self.find_nearest_interval(meshaxis.lX)
+            gg = self.ggs[table_interval]
+            y = self.yield_files[table_interval]
+            signal = Signal(meshshower,meshaxis,self.counters,self.y,gg,y)
             curved_correction = meshaxis.get_curved_atm_correction(self.counters)
 
             axis_vectors[i,:] = meshaxis.vectors
@@ -527,7 +560,7 @@ class ShowerSimulation:
         '''This method returns a ShowerSignal object with the photons calculated
         along the axis.
         '''
-        signal = Signal(self.shower,self.axis,self.counters,self.y)
+        signal = Signal(self.shower,self.axis,self.counters,self.y,self.linear_gg,self.linear_y)
         curved_correction = self.axis.get_curved_atm_correction(self.counters)
 
         if att:

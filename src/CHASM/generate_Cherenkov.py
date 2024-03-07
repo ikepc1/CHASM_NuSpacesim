@@ -20,7 +20,7 @@ class MakeYield:
         self.l_min = l_min
         self.l_max = l_max
         self.l_mid = np.mean([l_min, l_max])
-        self.set_yield_attributes(npzfile)
+        # self.set_yield_attributes(npzfile)
 
     def __repr__(self):
         return "Yield(l_min={:.2f} nm, l_max={:.2f} nm)".format(
@@ -49,12 +49,12 @@ class MakeYield:
     #     # return self.npz_files[lX_key]
     #     return 'y_t_delta.npz'
 
-    def set_yield_attributes(self, file: str):
+    def set_yield_attributes(self, y: dict[str,np.ndarray]):
         '''This method sets the yield (as a function of stage and delta)
         attributes from the specified file.
         '''
-        with as_file(files('CHASM.data')/f'{file}') as yieldfile:
-            y = np.load(yieldfile)
+        # with as_file(files('CHASM.data')/f'{file}') as yieldfile:
+        #     y = np.load(yieldfile)
 
         self.y_delta_t = y['y_t_delta'] * self.lambda_interval(self.l_min, self.l_max)
         self.delta = y['ds']

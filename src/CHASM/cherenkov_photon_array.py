@@ -31,18 +31,50 @@ from scipy.interpolate import RegularGridInterpolator
 #         gg space.
 #         The input arrays must all be the same size
 #         '''
-#         theta[theta == 0.] = 1.e-8
+#         # theta[theta == 0.] = 1.e-8
 #         if not np.size(t) == np.size(delta) == np.size(theta):
 #             raise ValueError('Input arrays must all be the same size.')
 #         pts = np.vstack((t, np.log(delta), np.log(theta))).T
 #         return self.interpolator(pts)
+
+# class CherenkovPhotonArray:
+#     """A class for using the full array of CherenkovPhoton values
+#     at a series of stages, t, and atmospheric delta values.
+#     """
+
+#     def __init__(self,gg: dict[str,np.ndarray]):
+#         """Create a CherenkovPhotonArray object from a npz file. The
+#         npz file should contain the Cherenkov angular distributions
+#         for a set of stages and delta values. It should also contain
+#         arrays of the values for t, delta, and theta.
+
+#         Parameters:
+#             npzfile: The input file containing the angular distributions
+#                 and values.
+
+#         The npz file should have exactly these keys: "gg_t_delta_theta",
+#         "t", "delta", and "theta".
+#         """
+#         # with as_file(files('CHASM.data')/f'{npzfile}') as file:
+#         #     gg = np.load(file)
+
+#         self.gg_t_delta_theta = gg['gg_t_delta_theta']
+#         self.t = gg['t']
+#         self.delta = gg['delta']
+#         self.theta = gg['theta']
+
+#     def angular_distribution(self,t,delta):
+#         it = np.abs(self.t - t).argmin()
+#         id = np.abs(self.delta - delta).argmin()
+#         gg = self.gg_t_delta_theta[it,id]
+#         return gg
 
 class CherenkovPhotonArray:
     """A class for using the full array of CherenkovPhoton values
     at a series of stages, t, and atmospheric delta values.
     """
 
-    def __init__(self,npzfile):
+    def __init__(self,gg):
         """Create a CherenkovPhotonArray object from a npz file. The
         npz file should contain the Cherenkov angular distributions
         for a set of stages and delta values. It should also contain
@@ -55,8 +87,8 @@ class CherenkovPhotonArray:
         The npz file should have exactly these keys: "gg_t_delta_theta",
         "t", "delta", and "theta".
         """
-        with as_file(files('CHASM.data')/f'{npzfile}') as file:
-            gg = np.load(file)
+        # with as_file(files('CHASM.data')/f'{npzfile}') as file:
+        #     gg = np.load(file)
 
         self.gg_t_delta_theta = gg['gg_t_delta_theta']
         self.t = gg['t']
@@ -142,9 +174,12 @@ class CherenkovPhotonArray:
         return gg1
 
 if __name__ == '__main__':
-    cpa = CherenkovPhotonArray('gg_t_delta_theta.npz')
+    import matplotlib.pyplot as plt
+    plt.ion()
+    cpa = CherenkovPhotonArray('gg_t_delta_theta_mc.npz')
     value = cpa.interpolate(0.5,0.0001,0.015)
     print("CherenkovPhotonArray @ t=0.5, delta=0.0001, theta=0.015: %.2e"%value)
     ggtd = cpa.angular_distribution(0.5,0.0001)
     print("CherenkovPhotonArray angular distribution @ t=0.5, delta=0.0001:")
-    print(ggtd)
+    plt.plot(ggtd)
+    plt.loglog()
