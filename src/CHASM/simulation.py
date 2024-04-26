@@ -18,7 +18,7 @@ class EventioWrapper(eventio.IACTFile):
         self.event = self.get_event()
         self.theta = self.event.header[10]
         self.phi = self.event.header[11] + np.pi #CHASM coordinate system rhat points up the axis, not down like CORSIKA
-        self.obs = self.event.header[5]/100. #convert obs level to meters
+        self.obs = self.header[5][0]/100. #convert obs level to meters
         nl = self.event.longitudinal['nthick'] #number of depth steps
         self.X = np.arange(nl, dtype=float) * self.event.longitudinal['thickstep'] #create depth steps
         self.nch = np.array(self.event.longitudinal['data'][6]) #corresponding number of charged particles
@@ -77,6 +77,16 @@ class EventioWrapper(eventio.IACTFile):
         '''This method returns the array of the number of photons in each photon bunch for a particular
         event and counter.'''
         return self.get_event(event_index).photon_bunches[counter_index]['photons']
+    
+    def get_zeniths(self, i: int, event_index: int = 0) -> np.ndarray:
+        obslevel = 1.471e5
+        ev = self.get_event(event_index)
+        z = np.array(ev.photon_bunches[i]['zem'])
+        cx = np.array(ev.photon_bunches[i]['cx'])
+        cy = np.array(ev.photon_bunches[i]['cy'])
+        z -= obslevel
+        cz = np.sqrt(1 - (cx**2 + cy**2))
+        return np.arccos(cz)
 
     def shower_coordinates(self):
         """
@@ -87,7 +97,7 @@ class EventioWrapper(eventio.IACTFile):
         y_e = []
         z_e = []
         p_e = []
-        obslevel = self.header[5][4]
+        obslevel = self.header[5][0]
         for i in range(len(self.telescope_positions)):
             pos = self.telescope_positions[i]
             x_t = np.array(self.event.photon_bunches[i]['x'])

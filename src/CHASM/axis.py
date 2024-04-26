@@ -211,7 +211,7 @@ class Attenuation(ABC):
     # def vertical_log_fraction(self) -> np.ndarray:
     #     '''This method returns the natural log of the fraction of light which
     #     survives each axis step if the light is travelling vertically.
-    #
+    
     #     The returned array is of size:
     #     # of yield bins, with each entry being on size:
     #     # of axis points
@@ -224,32 +224,32 @@ class Attenuation(ABC):
     #         log_fraction_array[i] = -cs * N * dh
     #     return log_fraction_array
 
-    # def vertical_log_fraction(self) -> np.ndarray:
-    #     '''This method returns the natural log of the fraction of light which
-    #     survives each axis step if the light is travelling vertically.
-    #
-    #     The returned array is of size:
-    #     # of yield bins, with each entry being of size:
-    #     # of axis points
-    #     '''
-    #     log_fraction_array = np.empty_like(self.yield_array, dtype='O')
-    #     for i, y in enumerate(self.yield_array):
-    #         ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
-    #         e_of_h = np.interp(self.axis.h, self.altitude_list, ecoeffs)
-    #         frac_surviving = np.exp(-e_of_h)
-    #         frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
-    #         log_fraction_array[i] = np.log(frac_step_surviving)
-    #     return log_fraction_array
-
     def vertical_log_fraction(self) -> np.ndarray:
         '''This method returns the natural log of the fraction of light which
         survives each axis step if the light is travelling vertically.
-
+    
         The returned array is of size:
         # of yield bins, with each entry being of size:
         # of axis points
         '''
-        return np.frompyfunc(self.calculate_vlf,1,1)(self.lambda_mids)
+        log_fraction_array = np.empty_like(self.yield_array, dtype='O')
+        for i, y in enumerate(self.yield_array):
+            ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
+            e_of_h = np.interp(self.axis.h, self.altitude_list, ecoeffs)
+            frac_surviving = np.exp(-e_of_h)
+            frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
+            log_fraction_array[i] = np.log(frac_step_surviving)
+        return log_fraction_array
+
+    # def vertical_log_fraction(self) -> np.ndarray:
+    #     '''This method returns the natural log of the fraction of light which
+    #     survives each axis step if the light is travelling vertically.
+
+    #     The returned array is of size:
+    #     # of yield bins, with each entry being of size:
+    #     # of axis points
+    #     '''
+    #     return np.frompyfunc(self.calculate_vlf,1,1)(self.lambda_mids)
 
     def calculate_vlf(self, l):
         '''This method returns the natural log of the fraction of light which
@@ -262,7 +262,7 @@ class Attenuation(ABC):
         array of vertical-log-fraction values (size = # of axis points)
         '''
         ecoeffs = self.ecoeff[np.abs(l - self.l_list).argmin()]
-        e_of_h = np.interp(self.axis.altitude, self.altitude_list, ecoeffs)
+        e_of_h = np.interp(self.axis.altitude, self.altitude_list, ecoeffs, left = 0., right = 0.)
         frac_surviving = np.exp(-e_of_h)
         frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
         return np.log(frac_step_surviving)
