@@ -50,7 +50,7 @@ sim.add(ch.UserShower(X,nch))
 sim.add(ch.Yield(270,1000,N_bins=1))
 
 #run simulation
-sig = sim.run(mesh=True, att=True)
+sig = sim.run(mesh=False, att=True)
 
 #plot signal at each detector
 fig = plt.figure()

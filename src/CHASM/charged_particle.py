@@ -458,11 +458,11 @@ class LateralDistributionNKG:
                 drho_dN_of_t_d_r[i,j] = self.d_rho_dA_of_r_d(rs, d)
         return ts, ds, rs, drho_dN_of_t_d_r
 
-    def make_lX_table(self):
+    def make_lX_table(self,nintervals):
         ts = np.linspace(-20.,20.,1000)
         # lXs = np.array([-3.5,-2.5,-1.5,-.5,.5])
         # lXs = np.arange(-4,1)
-        lX_intervals = np.linspace(-6,1,15)
+        lX_intervals = np.linspace(-6,1,nintervals)
         lXs = (lX_intervals + (np.diff(lX_intervals)/2)[0])[:-1]
         n_t_lX_of_t_lX = np.empty((ts.size,lXs.size),dtype=float)
         for i, t in enumerate(ts):
