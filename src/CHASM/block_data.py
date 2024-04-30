@@ -330,6 +330,8 @@ def make_longitudinal(sig: ShowerSignal) -> LongitudinalData:
     X = sig.axis.X
     charged_particles = sig.shower.profile(X)
     N_thick = int(np.floor(X.max()))
+    if N_thick > 32765:
+        N_thick = 32765
     Xs = np.arange(N_thick)
 
     #depending on upward vs downward axis, the depths will increasing or decreasing
