@@ -27,3 +27,4 @@ _version.py
 .tox
 *.ipynb
 src/CHASM/comp_tests.py
+tests/upward_tests.py
