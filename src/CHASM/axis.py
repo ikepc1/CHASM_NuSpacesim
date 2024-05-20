@@ -362,6 +362,7 @@ class Axis(ABC):
     
 
     def __init__(self, params: AxisParams):
+        self.params = params
         self.config = AxisConfig()
         self.atm = self.config.ATM
         self.ground_level = params.ground_level
@@ -377,7 +378,7 @@ class Axis(ABC):
     @zenith.setter
     def zenith(self, zenith):
         '''zenith angle property setter'''
-        if zenith >= np.pi/2:
+        if zenith > np.pi/2:
             raise ValueError('Zenith angle cannot be greater than pi / 2')
         if zenith < 0.:
             raise ValueError('Zenith angle cannot be less than 0')
@@ -423,7 +424,7 @@ class Axis(ABC):
     def h(self) -> np.ndarray:
         '''This is the height above the ground attribute'''
         hs = self.altitude - self.ground_level
-        hs[0] = 1.e-5
+        # hs[0] = 1.e-5
         return hs
 
     @property
@@ -537,11 +538,11 @@ class Axis(ABC):
     def X(self) -> np.ndarray:
         '''This method sets the depth along the shower axis attribute'''
 
-    @abstractmethod
-    def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
-        '''This method is the integrand as a function of altitude for calculating slant
-        depth.
-        '''
+    # @abstractmethod
+    # def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
+    #     '''This method is the integrand as a function of altitude for calculating slant
+    #     depth.
+    #     '''
 
     @abstractmethod
     def distance(self, X: np.ndarray) -> np.ndarray:
@@ -1096,6 +1097,127 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
     
     def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
         return DownwardCurvedCorrection
+    
+    def get_attenuation_class(self) -> Attenuation:
+        '''This method returns the flat atmosphere attenuation object for downward
+        axes'''
+        return DownwardAttenuation
+
+class MakeOverLimbAxis(Axis):
+    '''This is the implementation of an over the limb shower axis. In this case, the 
+    origin of the CHASM coordinate system is the axis distance of closest approach.
+    '''
+
+    def __init__(self, params: AxisParams):
+        self.params = params
+        self.config = AxisConfig()
+        self.atm = self.config.ATM
+        self.ground_level = params.ground_level
+        self.zenith = params.zenith
+        self.azimuth = params.azimuth
+        # self.altitude = self.mirror_altitude()
+        # tmp_upward = MakeUpwardAxisCurvedAtm(self.params)
+        # tmp_downward = MakeDownwardAxisCurvedAtm(self.params)
+        # self._X = self.combine_depths(tmp_upward, tmp_downward)
+        # self._r = self.construct_axis_distances(tmp_upward)
+
+    @cached_property
+    def h(self) -> np.ndarray:
+        '''Override heights (z values) as they are all the same.
+        '''
+        return np.full(self.config.N_POINTS, self.ground_level)
+    
+    @cached_property
+    def r(self) -> np.ndarray:
+        '''This calculates the limits on the axis.
+        '''
+        ra = np.sqrt((self.earth_radius+self.atm.maximum_height)**2 - (self.earth_radius+self.ground_level)**2)
+        return np.linspace(-ra, ra, self.config.N_POINTS)
+    
+    @cached_property
+    def altitude(self) -> np.ndarray:
+        '''This calculates the altitude of every axis point.
+        '''
+        return np.sqrt(self.r**2+(self.earth_radius+self.ground_level)**2) - self.earth_radius
+
+    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+        '''This is the integrand needed to calculate slant depth.
+        '''
+        num = (alt + self.earth_radius)
+        denom = np.sqrt((np.cos(self.zenith)**2)*self.earth_radius**2 + alt**2 + 2*alt*self.earth_radius)
+        dL_dz = num / denom
+        return self.atm.density(alt) * dL_dz
+    
+    @cached_property
+    def X(self) -> np.ndarray:
+        '''This method sets the depth attribute, depths are added along the axis
+        in the downward direction'''
+        rho = self.atm.density(self.altitude)
+        return -cumtrapz(rho[::-1],self.r[::-1], initial=0.)[::-1] / 10.
+        # alt_reversed = self.altitude[::-1]
+        # down_part = -cumtrapz(self.slant_depth_integrand(alt_reversed[:alt_reversed.argmin()]) / 10.,alt_reversed[:alt_reversed.argmin()], initial=0)[::-1]
+        # up_part = cumtrapz(self.slant_depth_integrand(alt_reversed[alt_reversed.argmin():]) / 10.,alt_reversed[alt_reversed.argmin():], initial=0)[::-1]
+        # return np.concatenate((up_part, down_part))
+    
+    def distance(self, X: np.ndarray) -> np.ndarray:
+        '''This method is the distance along the axis as a function of depth.
+        It is the same as for a downward axis.
+        '''
+        return np.interp(X, self.X[::-1], self.r[::-1])[::-1]
+
+    def theta(self, axis_vectors, counters: Counters) -> np.ndarray:
+        '''This method returns the angle between the axis and the vector going
+        to the counter, in this case it's the internal angle.
+        It is the same as for a downward axis.
+        '''
+        theta = counters.calculate_theta(axis_vectors)
+        theta[:,self.r<0] = np.pi - theta[:,self.r<0]
+        return theta
+
+    def get_gg_file(self) -> str:
+        '''This method returns the original gg array file.
+        '''
+        return 'gg_t_delta_theta_mc.npz'
+
+    def reset_for_profile(self, shower: Shower) -> None:
+        '''This method resets the attributes of the class based on where the shower
+        occurs on the axis. We dont need to run universality calculations where
+        there's no shower.
+        '''
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        a = self.altitude[::-1]
+        self.altitude = a[np.argmax(ids[::-1]):][::-1]
+        x = self.X[::-1]
+        self.X = x[np.argmax(ids[::-1]):][::-1]
+        r = self.r[::-1]
+        self.r = r[np.argmax(ids[::-1]):][::-1]
+        h = self.h[::-1]
+        self.h = h[np.argmax(ids[::-1]):][::-1]
+
+    def reset_for_counters(self, counters: Counters) -> None:
+        thetas = self.theta(self.vectors, counters)
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        a = self.altitude[::-1]
+        self.altitude = a[np.argmax(ids[::-1]):][::-1]
+        x = self.X[::-1]
+        self.X = x[np.argmax(ids[::-1]):][::-1]
+        r = self.r[::-1]
+        self.r = r[np.argmax(ids[::-1]):][::-1]
+        h = self.h[::-1]
+        self.h = h[np.argmax(ids[::-1]):][::-1]
+
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        return DownwardCurvedCorrection
+    
+    def get_timing_class(self) -> Timing:
+        '''This method returns the flat atm downward timing class
+        '''
+        return DownwardTimingCurved
+    
+    def get_attenuation_class(self) -> Attenuation:
+        '''This method returns the flat atmosphere attenuation object for downward
+        axes'''
+        return DownwardAttenuation
 
 class DownwardCurvedCorrection(CurvedAtmCorrection):
     '''This is the implementation of the curved atmosphere integration for
@@ -1143,7 +1265,7 @@ class UpwardCurvedCorrection(CurvedAtmCorrection):
             test_Q = np.linspace(self.Q[:,i].min(), self.Q[:,i].max(), 5)
             test_cQ = np.cos(test_Q)
             test_sQ = np.sin(test_Q)
-            t1 = test_cQ[:,np.newaxis] * self.cQd[i:] #these two lines are what's different for up vs down
+            t1 = test_cQ[:,np.newaxis] * self.cQd[i:] #these three lines are what's different for up vs down
             t2 = test_sQ[:,np.newaxis] * self.sQd[i:]
             test_integrals = np.sum(vert[i:] / (t1 + t2), axis = 1)
             integrals[:,i] = np.interp(self.Q[:,i], test_Q, test_integrals)
