@@ -212,6 +212,7 @@ class Signal:
         for i in range(gg.shape[1]):
             gg_td = self.gga.angular_distribution(self.t[i], self.axis.delta[i])
             gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
+        gg[self.theta>np.pi/2] = 0.
         return gg
     
     @property
