@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, Any
 import eventio
 import numpy as np
 from astropy.table import QTable, Table, Column
@@ -278,10 +278,10 @@ class Element(Protocol):
     '''This is the protocol for a simulation element. It needs a type, either
     axis, shower, counters, or yield'''
     @property
-    def element_type(self):
+    def element_type(self) -> str:
         ...
 
-    def create(self) -> object:
+    def create(self) -> Any:
         ...
 
 def x_y_cx_cy(source_points: np.ndarray, counters: Counters) -> tuple[np.ndarray]:

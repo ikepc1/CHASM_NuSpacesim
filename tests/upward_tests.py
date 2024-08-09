@@ -12,7 +12,7 @@ sim = ch.ShowerSimulation()
 sim.add(ch.UpwardAxis(zenith,azimuth,curved=True))
 
 #add grid of detectors
-n_side = 30
+n_side = 50
 grid_width = 100000.
 detector_grid_alt = 525. #km
 
