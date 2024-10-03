@@ -923,7 +923,8 @@ class MakeUpwardAxis(Axis):
         occurs on the axis. We dont need to run universality calculations where
         there's no shower.
         '''
-        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        # ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES * shower.N_max
         self.altitude = self.altitude[np.argmax(ids):]
         self.X = self.X[np.argmax(ids):]
 
@@ -1028,7 +1029,8 @@ class MakeDownwardAxis(Axis):
         occurs on the axis. We dont need to run universality calculations where
         there's no shower.self
         '''
-        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        # ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES * shower.N_max
         a = self.altitude[::-1]
         self.altitude = a[np.argmax(ids[::-1]):][::-1]
         x = self.X[::-1]
@@ -1197,7 +1199,8 @@ class MakeOverLimbAxis(Axis):
         occurs on the axis. We dont need to run universality calculations where
         there's no shower.
         '''
-        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        # ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES * shower.N_max
         a = self.altitude[::-1]
         self.altitude = a[np.argmax(ids[::-1]):][::-1]
         x = self.X[::-1]
