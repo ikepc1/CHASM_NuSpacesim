@@ -275,8 +275,8 @@ class Attenuation(ABC):
         for i, y in enumerate(self.yield_array):
             l_mid_array[i] = y.l_mid
         return l_mid_array
-
-    def nm_to_cm(self,l):
+    @staticmethod
+    def nm_to_cm(l):
         return l*nano*1.e2
 
     def rayleigh_cs(self, h, l = 400.):

@@ -55,7 +55,7 @@ sig = sim.run(mesh=False, att=True)
 #plot signal at each detector
 fig = plt.figure()
 cx = xx.flatten()*1.e-3
-cy = yy.flatten()*1.e-3
+cy = yy.flatten()*1.e-3 - yy.mean()
 h2d = plt.hist2d(cx,cy,weights=sig.photons.sum(axis=2).sum(axis=1),bins=n_side)
 plt.suptitle('Cherenkov Upward Shower Signal at 525km Altitude')
 # plt.title(f'Xmax = {xmax:.1f}, Nmax = {nmax:.1e}, X0 = {x0}, lambda = {Lambda}')

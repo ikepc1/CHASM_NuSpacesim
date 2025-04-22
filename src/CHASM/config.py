@@ -7,9 +7,9 @@ class AxisConfig:
     '''This is the container for axis config parameters.
     '''
     N_POINTS: int = 1000
-    N_IN_RING: int = 5
-    MIN_CHARGED_PARTICLES: float = 1.e-2 #number of charged particles for a step to be considered in cherenkov calcs
+    N_IN_RING: int = 3
+    MIN_CHARGED_PARTICLES: float = 1.e-1 #number of charged particles for a step to be considered in cherenkov calcs
     ATM: Atmosphere = CorsikaAtmosphere()
     # ATM: Atmosphere = USStandardAtmosphere()
-    MAX_RING_SIZE: float = 300
+    MAX_RING_SIZE: float = 300.
   

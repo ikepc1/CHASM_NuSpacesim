@@ -24,8 +24,11 @@ from scipy.interpolate import LinearNDInterpolator
 #         self.t = gg['t']
 #         self.delta = gg['delta']
 #         self.theta = gg['theta']
-#         tgrid = np.reshape
-#         self.interpolator = LinearNDInterpolator((self.t, np.log(self.delta), np.log(self.theta)), self.gg_t_delta_theta, fill_value=0.)
+#         t = np.broadcast_to(self.t,(len(self.theta),len(self.delta),len(self.t))).T
+#         dt = np.broadcast_to(self.delta,(len(self.t),len(self.delta)))
+#         delta = np.log10(np.broadcast_to(dt.T,(len(self.theta),len(self.delta),len(self.t))).T)
+#         theta = np.log10(np.broadcast_to(self.theta,(len(self.t),len(self.delta),len(self.theta))))
+#         self.interpolator = LinearNDInterpolator(list(zip(t.flatten(), delta.flatten(), theta.flatten())), self.gg_t_delta_theta.flatten())
 
 #     def gg_of_t_delta_theta(self, t: np.ndarray, delta: np.ndarray, theta: np.ndarray) -> np.ndarray:
 #         '''This method returns the linear interpolation of a 3d (t,d,q) point in

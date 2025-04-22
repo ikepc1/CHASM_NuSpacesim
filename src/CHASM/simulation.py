@@ -378,6 +378,9 @@ class ShowerSignal:
             bunches[i,:,7] = -l
         return bunches.reshape((-1,8)).astype(np.float32)
 
+def diffunc(r, rc=32.47947175, s=-22.11021685):
+    return np.exp(-(r-s)/rc) 
+
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
     lXs = np.linspace(-6,1,15)
@@ -519,6 +522,7 @@ class ShowerSimulation:
         times_array = np.empty((self.N_c, len(self.lX_intervals), N_axis_points))
         charged_particle_array = np.empty((len(self.lX_intervals), N_axis_points))
         depth_array = np.empty_like(charged_particle_array)
+        diff = diffunc(self.counters.r)
 
         #calculate signal at each mesh ring
         for i, lX in enumerate(self.lX_intervals):
@@ -533,6 +537,8 @@ class ShowerSimulation:
             axis_vectors[i,:] = meshaxis.vectors
 
             if att:
+                # p = self.get_attenuated_photons_array(signal, curved_correction)
+                # photons_array[:,:,i] = p - (p.T * diff).T
                 photons_array[:,:,i] = self.get_attenuated_photons_array(signal, curved_correction)
             else:
                 photons_array[:,:,i] = signal.calculate_ng()

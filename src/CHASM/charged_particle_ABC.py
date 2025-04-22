@@ -58,7 +58,7 @@ class LafebreEnergyDistribution(EnergyDistribution):
                    [0.485,0.183,8.17e-4,3.22,0.0068,106.,1.00,1.0,0.0372],  # Ele
                    [0.516,0.201,5.42e-4,4.36,0.0663,143.,0.15,2.0,0.0374]]) # Pos
 
-    ll = np.log(1.e-1) #lower limit
+    ll = np.log(1.e-2) #lower limit
     ul = np.log(1.e11) #upper limit
 
     def __init__(self,part,t):
@@ -315,29 +315,35 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     plt.ion()
 
-    # ts = np.linspace(-20,20,5)
-    # ed = LafebreEnergyDistribution('Tot', ts[0])
-    # plt.figure()
-    # lEs = np.linspace(ed.ll,ed.ul,100)
-    # for t in ts:
-    #     ed.set_stage(t)
-    #     plt.plot(lEs,ed.n_t_lE(lEs),label = str(t))
-    # plt.legend()
-
-    eed = LafebreEnergyDistribution('Ele', 0.)
-    ped = LafebreEnergyDistribution('Pos', 0.)
-    ted = LafebreEnergyDistribution('Tot', 0.)
-    lEs = np.linspace(eed.ll,eed.ul,100)
+    ts = np.linspace(-20,20,5)
+    ed = LafebreEnergyDistribution('Tot', ts[0])
+    plt.figure()
+    lEs = np.linspace(ed.ll,ed.ul,100)
+    for t in ts:
+        ed.set_stage(t)
+        plt.plot(lEs,ed.n_t_lE(lEs),label = str(t))
+    plt.legend()
+    t = 0.
+    eed = LafebreEnergyDistribution('Ele', t)
+    ped = LafebreEnergyDistribution('Pos', t)
+    ted = LafebreEnergyDistribution('Tot', t)
+    lEs = np.linspace(eed.ll,12,100)
     plt.figure()
     plt.plot(lEs,eed.n_t_lE(lEs),label='electron')
     plt.plot(lEs,ped.n_t_lE(lEs),label='positron')
     plt.plot(lEs,ted.n_t_lE(lEs),label='total')
+    plt.suptitle('Universal Charged Particle Energy Distribution')
+    plt.title(f'Stage = {t:.1f}')
+    plt.xlabel('ln(E (MeV))')
+    plt.ylabel('f_e(t,ln(E))')
+    plt.semilogy()
+    plt.grid()
     plt.legend()
 
-    # ll = np.radians(0.1)
-    # ul = np.radians(45.)
-    # lqrad = np.linspace(np.log(ll),np.log(ul),450)
-    # qrad = np.exp(lqrad)
+    ll = np.radians(0.05)
+    ul = np.radians(45.)
+    lqrad = np.linspace(np.log(ll),np.log(ul),450)
+    qrad = np.exp(lqrad)
     #
     # fig = plt.figure()
     # qd = LafebreAngularDistribution(np.log(1.))
@@ -358,17 +364,19 @@ if __name__ == '__main__':
     # fig = plt.figure()
     # qd = BergmanAngularDistribution(np.log(1.))
     # qd.set_lE(np.log(1.))
-    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 MeV B')
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 MeV')
     # qd.set_lE(np.log(5.))
-    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='5 MeV B')
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='5 MeV')
     # qd.set_lE(np.log(30.))
-    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='30 MeV B')
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='30 MeV')
     # qd.set_lE(np.log(170.))
-    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='170 MeV B')
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='170 MeV')
     # qd.set_lE(np.log(1.e3))
-    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 GeV B')
+    # plt.plot(qrad,qd.n_t_lE_Omega(qrad),label='1 GeV')
     # plt.loglog()
+    # plt.grid()
     # plt.xlim(ll,ul)
-    # plt.legend()
-    # plt.xlabel('Theta [rad]')
-    # plt.ylabel('n(t;lE,Omega)')
+    # plt.legend(title='Energy')
+    # plt.title('Charged Particle Angular Distribution')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('g_e(ln(E),Omega_e)')
