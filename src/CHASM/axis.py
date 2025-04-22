@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from importlib.resources import as_file, files
 from scipy.constants import value,nano
 from scipy.spatial.transform import Rotation as R
-from scipy.integrate import cumtrapz, quad
+from scipy.integrate import cumulative_trapezoid, quad
 from functools import cached_property
 # from scipy.stats import norm
 
@@ -900,7 +900,7 @@ class MakeUpwardAxis(Axis):
     def X(self) -> np.ndarray:
         '''This method sets the depth attribute'''
         # rho = self.atm.density(self.altitude)
-        # return cumtrapz(rho,self.r, initial=0.) / 10.
+        # return cumulative_trapezoid(rho,self.r, initial=0.) / 10.
         # axis_deltaX = np.sqrt(rho[1:] * rho[:-1]) * self.dr[1:] / 10# converting to g/cm^2
         # return np.concatenate((np.array([0]),np.cumsum(axis_deltaX)))
         depths = np.zeros_like(self.r)
@@ -1013,7 +1013,7 @@ class MakeDownwardAxis(Axis):
         # B = self.altitude[1:]
         # depths[:-1] = np.array([quad(self.slant_depth_integrand,a,b)[0] for a,b in zip(A,B)])
         # return np.cumsum(depths[::-1] / 10.)[::-1]
-        return -cumtrapz(self.slant_depth_integrand(self.altitude[::-1]) / 10.,self.altitude[::-1], initial=0)[::-1]
+        return -cumulative_trapezoid(self.slant_depth_integrand(self.altitude[::-1]) / 10.,self.altitude[::-1], initial=0)[::-1]
 
     def distance(self, X: np.ndarray) -> np.ndarray:
         '''This method is the distance along the axis as a function of depth'''
@@ -1168,10 +1168,10 @@ class MakeOverLimbAxis(Axis):
         '''This method sets the depth attribute, depths are added along the axis
         in the downward direction'''
         rho = self.atm.density(self.altitude)
-        return -cumtrapz(rho[::-1],self.r[::-1], initial=0.)[::-1] / 10.
+        return -cumulative_trapezoid(rho[::-1],self.r[::-1], initial=0.)[::-1] / 10.
         # alt_reversed = self.altitude[::-1]
-        # down_part = -cumtrapz(self.slant_depth_integrand(alt_reversed[:alt_reversed.argmin()]) / 10.,alt_reversed[:alt_reversed.argmin()], initial=0)[::-1]
-        # up_part = cumtrapz(self.slant_depth_integrand(alt_reversed[alt_reversed.argmin():]) / 10.,alt_reversed[alt_reversed.argmin():], initial=0)[::-1]
+        # down_part = -cumulative_trapezoid(self.slant_depth_integrand(alt_reversed[:alt_reversed.argmin()]) / 10.,alt_reversed[:alt_reversed.argmin()], initial=0)[::-1]
+        # up_part = cumulative_trapezoid(self.slant_depth_integrand(alt_reversed[alt_reversed.argmin():]) / 10.,alt_reversed[alt_reversed.argmin():], initial=0)[::-1]
         # return np.concatenate((up_part, down_part))
     
     def distance(self, X: np.ndarray) -> np.ndarray:
