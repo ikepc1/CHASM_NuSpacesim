@@ -10,7 +10,7 @@ import numpy as np
 from scipy.constants import physical_constants
 from scipy.integrate import quad
 
-from .atmosphere import *
+# from .atmosphere import *
 
 class EnergyDistribution:
     """
@@ -473,25 +473,27 @@ class LateralDistributionNKG:
 
 if __name__ == '__main__':
     ld = LateralDistributionNKG(0)
-    ld.make_lX_table()
-    # import matplotlib.pyplot as plt
-    # plt.ion()
+    # ld.make_lX_table()
+    import matplotlib.pyplot as plt
+    plt.ion()
     # atm = Atmosphere()
     # d = atm.density(0.)
-    #
-    # x = np.logspace(-3,2,100)
-    # lx = np.log(x)
-    # ld = LateralDistributionNKG(0)
-    # plt.figure()
-    # plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
-    # ld.set_t(-10)
-    # plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
-    # ld.set_t(10)
-    # plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
-    # plt.legend()
-    # plt.loglog()
-    # plt.xlabel('X (Moliere Units)')
-    # plt.ylabel('n_t_lX')
+    
+    x = np.logspace(-3,2,100)
+    lx = np.log(x)
+    ld = LateralDistributionNKG(0)
+    plt.figure()
+    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    ld.set_t(-10)
+    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    ld.set_t(10)
+    plt.plot(x, ld.n_t_lX(lx), label = f"t = {ld.t}")
+    plt.legend()
+    plt.loglog()
+    plt.grid()
+    plt.title('NKG Distribution')
+    plt.xlabel('X (Moliere Units)')
+    plt.ylabel('n(t;ln(X))')
     #
     # r = np.logspace(-3,3,100)
     # plt.figure()

@@ -241,32 +241,32 @@ class Attenuation(ABC):
             log_fraction_array[i] = np.log(frac_step_surviving)
         return log_fraction_array
 
-    # def vertical_log_fraction(self) -> np.ndarray:
+    # # def vertical_log_fraction(self) -> np.ndarray:
+    # #     '''This method returns the natural log of the fraction of light which
+    # #     survives each axis step if the light is travelling vertically.
+
+    # #     The returned array is of size:
+    # #     # of yield bins, with each entry being of size:
+    # #     # of axis points
+    # #     '''
+    # #     return np.frompyfunc(self.calculate_vlf,1,1)(self.lambda_mids)
+
+    # def calculate_vlf(self, l):
     #     '''This method returns the natural log of the fraction of light which
-    #     survives each axis step if the light is travelling vertically.
+    #     survives each axis step if the light is travelling vertically
 
-    #     The returned array is of size:
-    #     # of yield bins, with each entry being of size:
-    #     # of axis points
+    #     Parameters:
+    #     y: yield object
+
+    #     Returns:
+    #     array of vertical-log-fraction values (size = # of axis points)
     #     '''
-    #     return np.frompyfunc(self.calculate_vlf,1,1)(self.lambda_mids)
-
-    def calculate_vlf(self, l):
-        '''This method returns the natural log of the fraction of light which
-        survives each axis step if the light is travelling vertically
-
-        Parameters:
-        y: yield object
-
-        Returns:
-        array of vertical-log-fraction values (size = # of axis points)
-        '''
-        ecoeffs = self.ecoeff[np.abs(l - self.l_list).argmin()]
-        e_of_h = np.interp(self.axis.altitude, self.altitude_list, ecoeffs, left = 0., right = 0.)
-        frac_surviving = np.exp(-e_of_h)
-        frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
-        return np.log(frac_step_surviving)
-    #
+    #     ecoeffs = self.ecoeff[np.abs(l - self.l_list).argmin()]
+    #     e_of_h = np.interp(self.axis.altitude, self.altitude_list, ecoeffs, left = 0., right = 0.)
+    #     frac_surviving = np.exp(-e_of_h)
+    #     frac_step_surviving = 1. - np.diff(frac_surviving[::-1], append = 1.)[::-1]
+    #     return np.log(frac_step_surviving)
+    # #
 
     @property
     def lambda_mids(self):
@@ -275,8 +275,8 @@ class Attenuation(ABC):
         for i, y in enumerate(self.yield_array):
             l_mid_array[i] = y.l_mid
         return l_mid_array
-
-    def nm_to_cm(self,l):
+    @staticmethod
+    def nm_to_cm(l):
         return l*nano*1.e2
 
     def rayleigh_cs(self, h, l = 400.):
@@ -362,6 +362,7 @@ class Axis(ABC):
     
 
     def __init__(self, params: AxisParams):
+        self.params = params
         self.config = AxisConfig()
         self.atm = self.config.ATM
         self.ground_level = params.ground_level
@@ -377,7 +378,7 @@ class Axis(ABC):
     @zenith.setter
     def zenith(self, zenith):
         '''zenith angle property setter'''
-        if zenith >= np.pi/2:
+        if zenith > np.pi/2:
             raise ValueError('Zenith angle cannot be greater than pi / 2')
         if zenith < 0.:
             raise ValueError('Zenith angle cannot be less than 0')
@@ -477,6 +478,19 @@ class Axis(ABC):
         cq[cq<-1.] = -1.
         # cq = ((cls.earth_radius+h)**2+r**2-cls.earth_radius**2)/(2*r*(cls.earth_radius+h))
         return np.arccos(cq)
+    
+    def vector_altitude(self, input_vectors: np.ndarray) -> np.ndarray:
+        '''This method calculates the altitude of the endpoint of a vector in the 
+        CHASM coordinate system.
+
+        Vectors should be of shape (n,3) and the returned array is of shape (n,).
+        '''
+        if input_vectors.shape[1] != 3 or len(input_vectors.shape) != 2:
+            raise ValueError("Input is not an array of vectors.")
+        
+        rxy = np.sqrt(input_vectors[:,0]**2 + input_vectors[:,1]**2)
+        return np.sqrt(rxy**2 + (self.earth_radius + self.ground_level)**2) - self.earth_radius
+
 
     @property
     def theta_difference(self) -> np.ndarray:
@@ -537,11 +551,11 @@ class Axis(ABC):
     def X(self) -> np.ndarray:
         '''This method sets the depth along the shower axis attribute'''
 
-    @abstractmethod
-    def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
-        '''This method is the integrand as a function of altitude for calculating slant
-        depth.
-        '''
+    # @abstractmethod
+    # def slant_depth_integrand(self, h: float | np.ndarray) -> float | np.ndarray:
+    #     '''This method is the integrand as a function of altitude for calculating slant
+    #     depth.
+    #     '''
 
     @abstractmethod
     def distance(self, X: np.ndarray) -> np.ndarray:
@@ -909,7 +923,8 @@ class MakeUpwardAxis(Axis):
         occurs on the axis. We dont need to run universality calculations where
         there's no shower.
         '''
-        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        # ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES * shower.N_max
         self.altitude = self.altitude[np.argmax(ids):]
         self.X = self.X[np.argmax(ids):]
 
@@ -1014,7 +1029,8 @@ class MakeDownwardAxis(Axis):
         occurs on the axis. We dont need to run universality calculations where
         there's no shower.self
         '''
-        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        # ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES * shower.N_max
         a = self.altitude[::-1]
         self.altitude = a[np.argmax(ids[::-1]):][::-1]
         x = self.X[::-1]
@@ -1096,6 +1112,116 @@ class MakeDownwardAxisCurvedAtm(MakeDownwardAxis):
     
     def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
         return DownwardCurvedCorrection
+    
+    def get_attenuation_class(self) -> Attenuation:
+        '''This method returns the flat atmosphere attenuation object for downward
+        axes'''
+        return DownwardAttenuation
+
+class MakeOverLimbAxis(Axis):
+    '''This is the implementation of an over the limb shower axis. In this case, the 
+    origin of the CHASM coordinate system is the axis distance of closest approach.
+    '''
+
+    def __init__(self, params: AxisParams):
+        self.params = params
+        self.config = AxisConfig()
+        self.atm = self.config.ATM
+        self.ground_level = params.ground_level
+        self.zenith = params.zenith
+        self.azimuth = params.azimuth
+        # self.altitude = self.mirror_altitude()
+        # tmp_upward = MakeUpwardAxisCurvedAtm(self.params)
+        # tmp_downward = MakeDownwardAxisCurvedAtm(self.params)
+        # self._X = self.combine_depths(tmp_upward, tmp_downward)
+        # self._r = self.construct_axis_distances(tmp_upward)
+
+    @cached_property
+    def h(self) -> np.ndarray:
+        '''Override heights (z values) as they are all the same.
+        '''
+        return np.full(self.config.N_POINTS, self.ground_level)
+    
+    @cached_property
+    def r(self) -> np.ndarray:
+        '''This calculates the limits on the axis.
+        '''
+        ra = np.sqrt((self.earth_radius+self.atm.maximum_height)**2 - (self.earth_radius+self.ground_level)**2)
+        return np.linspace(-ra, ra, self.config.N_POINTS)
+    
+    @cached_property
+    def altitude(self) -> np.ndarray:
+        '''This calculates the altitude of every axis point.
+        '''
+        return np.sqrt(self.r**2+(self.earth_radius+self.ground_level)**2) - self.earth_radius
+
+    def slant_depth_integrand(self, alt: float | np.ndarray) -> float | np.ndarray:
+        '''This is the integrand needed to calculate slant depth.
+        '''
+        num = (alt + self.earth_radius)
+        denom = np.sqrt((np.cos(self.zenith)**2)*self.earth_radius**2 + alt**2 + 2*alt*self.earth_radius)
+        dL_dz = num / denom
+        return self.atm.density(alt) * dL_dz
+    
+    @cached_property
+    def X(self) -> np.ndarray:
+        '''This method sets the depth attribute, depths are added along the axis
+        in the downward direction'''
+        rho = self.atm.density(self.altitude)
+        return -cumtrapz(rho[::-1],self.r[::-1], initial=0.)[::-1] / 10.
+        # alt_reversed = self.altitude[::-1]
+        # down_part = -cumtrapz(self.slant_depth_integrand(alt_reversed[:alt_reversed.argmin()]) / 10.,alt_reversed[:alt_reversed.argmin()], initial=0)[::-1]
+        # up_part = cumtrapz(self.slant_depth_integrand(alt_reversed[alt_reversed.argmin():]) / 10.,alt_reversed[alt_reversed.argmin():], initial=0)[::-1]
+        # return np.concatenate((up_part, down_part))
+    
+    def distance(self, X: np.ndarray) -> np.ndarray:
+        '''This method is the distance along the axis as a function of depth.
+        It is the same as for a downward axis.
+        '''
+        return np.interp(X, self.X[::-1], self.r[::-1])[::-1]
+
+    def theta(self, axis_vectors, counters: Counters) -> np.ndarray:
+        '''This method returns the angle between the axis and the vector going
+        to the counter, in this case it's the internal angle.
+        It is the same as for a downward axis.
+        '''
+        theta = counters.calculate_theta(axis_vectors)
+        theta[:,self.r<0] = np.pi - theta[:,self.r<0]
+        return theta
+
+    def get_gg_file(self) -> str:
+        '''This method returns the original gg array file.
+        '''
+        return 'gg_t_delta_theta_mc.npz'
+
+    def reset_for_profile(self, shower: Shower) -> None:
+        '''This method resets the attributes of the class based on where the shower
+        occurs on the axis. We dont need to run universality calculations where
+        there's no shower.
+        '''
+        # ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES
+        ids = shower.profile(self.X) >= self.config.MIN_CHARGED_PARTICLES * shower.N_max
+        a = self.altitude[::-1]
+        self.altitude = a[np.argmax(ids[::-1]):][::-1]
+        x = self.X[::-1]
+        self.X = x[np.argmax(ids[::-1]):][::-1]
+        r = self.r[::-1]
+        self.r = r[np.argmax(ids[::-1]):][::-1]
+        h = self.h[::-1]
+        self.h = h[np.argmax(ids[::-1]):][::-1]
+
+    def get_curved_atm_correction_class(self) -> CurvedAtmCorrection:
+        return DownwardCurvedCorrection
+    
+    def get_timing_class(self) -> Timing:
+        '''This method returns the flat atm downward timing class
+        '''
+        return DownwardTimingCurved
+    
+    def get_attenuation_class(self) -> Attenuation:
+        '''This method returns the curved atmosphere attenuation object for downward
+        axes'''
+        return OverLimbAttenuation
 
 class DownwardCurvedCorrection(CurvedAtmCorrection):
     '''This is the implementation of the curved atmosphere integration for
@@ -1143,11 +1269,24 @@ class UpwardCurvedCorrection(CurvedAtmCorrection):
             test_Q = np.linspace(self.Q[:,i].min(), self.Q[:,i].max(), 5)
             test_cQ = np.cos(test_Q)
             test_sQ = np.sin(test_Q)
-            t1 = test_cQ[:,np.newaxis] * self.cQd[i:] #these two lines are what's different for up vs down
+            t1 = test_cQ[:,np.newaxis] * self.cQd[i:] #these three lines are what's different for up vs down
             t2 = test_sQ[:,np.newaxis] * self.sQd[i:]
             test_integrals = np.sum(vert[i:] / (t1 + t2), axis = 1)
             integrals[:,i] = np.interp(self.Q[:,i], test_Q, test_integrals)
         return integrals
+    
+class OverLimbCurvedCorrection(CurvedAtmCorrection):
+    def __init__(self, axis: MakeOverLimbAxis, counters: Counters) -> None:
+        self.axis = axis
+        self.counters = counters
+        self.cQ = counters.cos_Q(axis.vectors)
+        self.cQd = np.cos(axis.theta_difference)
+        self.sQd = np.sin(axis.theta_difference)
+        self.Q = np.arccos(self.cQ)
+
+    def curved_correction(self, vert: np.ndarray) -> np.ndarray:
+        '''This is the integration.
+        '''
 
 class NoCurvedCorrection(CurvedAtmCorrection):
     '''This class is does nothing but pass the axis and counters object.
@@ -1435,7 +1574,7 @@ class UpwardAttenuation(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, curved_correction: NoCurvedCorrection, yield_array: np.ndarray):
+    def __init__(self, curved_correction: UpwardCurvedCorrection, yield_array: np.ndarray):
         self.curved_correction = curved_correction
         self.axis = curved_correction.axis
         self.counters = curved_correction.counters
@@ -1462,7 +1601,7 @@ class UpwardAttenuationCurved(Attenuation):
     shower with a flat atmosphere.
     '''
 
-    def __init__(self, curved_correction: NoCurvedCorrection, yield_array: np.ndarray):
+    def __init__(self, curved_correction: UpwardCurvedCorrection, yield_array: np.ndarray):
         self.curved_correction = curved_correction
         self.axis = curved_correction.axis
         self.counters = curved_correction.counters
@@ -1484,3 +1623,35 @@ class UpwardAttenuationCurved(Attenuation):
             # log_frac_passed_list[i] = upward_curved_correction(self.axis, self.counters, v_log_frac)
             log_frac_passed_list[i] = self.curved_correction(v_log_frac)
         return log_frac_passed_list
+
+class OverLimbAttenuation(Attenuation):
+    '''This is the implementation of signal attenuation for an over the limb air
+    shower.
+    '''
+    def __init__(self, curved_correction: CurvedAtmCorrection, yield_array: np.ndarray):
+        self.curved_correction = curved_correction
+        self.axis = curved_correction.axis
+        self.counters = curved_correction.counters
+        self.yield_array = yield_array
+        self.atm = self.axis.atm
+
+    def log_fraction_passed(self) -> np.ndarray:
+        '''This method returns the natural log of the fraction of light
+        originating at each step on the axis which survives to reach the
+        counter.
+
+        The size of the returned array is of shape:
+        # of yield bins, with each entry being on size:
+        (# of counters, # of axis points)
+        '''
+        counter_altitudes = self.axis.vector_altitude(self.counters.vectors)
+        lfp_array = np.empty_like(self.yield_array, dtype='O')
+        for i, y in enumerate(self.yield_array):
+            ecoeffs = self.ecoeff[np.abs(y.l_mid-self.l_list).argmin()]
+            e_of_counter_h = np.interp(counter_altitudes, self.altitude_list, ecoeffs)
+            e_of_axis_h = np.interp(self.axis.altitude, self.altitude_list, ecoeffs)
+            frac_surviving = np.abs(np.exp(-e_of_counter_h)[:,np.newaxis] - np.exp(-e_of_axis_h))
+            print(frac_surviving.min())
+            frac_surviving /= self.curved_correction.cQ
+            lfp_array[i] = np.log(frac_surviving)
+        return lfp_array

@@ -1,10 +1,10 @@
 from importlib.resources import as_file, files
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import LinearNDInterpolator
 
 # class CherenkovPhotonArray:
 
-#     def __init__(self,npzfile):
+#     def __init__(self,gg):
 #         """Create a CherenkovPhotonArray object from a npz file. The
 #         npz file should contain the Cherenkov angular distributions
 #         for a set of stages and delta values. It should also contain
@@ -17,14 +17,18 @@ from scipy.interpolate import RegularGridInterpolator
 #         The npz file should have exactly these keys: "gg_t_delta_theta",
 #         "t", "delta", and "theta".
 #         """
-#         with as_file(files('CHASM.data')/f'{npzfile}') as file:
-#             gg = np.load(file)
+#         # with as_file(files('CHASM.data')/f'{npzfile}') as file:
+#         #     gg = np.load(file)
 
 #         self.gg_t_delta_theta = gg['gg_t_delta_theta']
 #         self.t = gg['t']
 #         self.delta = gg['delta']
 #         self.theta = gg['theta']
-#         self.interpolator = RegularGridInterpolator((self.t, np.log(self.delta), np.log(self.theta)), self.gg_t_delta_theta, bounds_error=False, fill_value=0.)
+#         t = np.broadcast_to(self.t,(len(self.theta),len(self.delta),len(self.t))).T
+#         dt = np.broadcast_to(self.delta,(len(self.t),len(self.delta)))
+#         delta = np.log10(np.broadcast_to(dt.T,(len(self.theta),len(self.delta),len(self.t))).T)
+#         theta = np.log10(np.broadcast_to(self.theta,(len(self.t),len(self.delta),len(self.theta))))
+#         self.interpolator = LinearNDInterpolator(list(zip(t.flatten(), delta.flatten(), theta.flatten())), self.gg_t_delta_theta.flatten())
 
 #     def gg_of_t_delta_theta(self, t: np.ndarray, delta: np.ndarray, theta: np.ndarray) -> np.ndarray:
 #         '''This method returns the linear interpolation of a 3d (t,d,q) point in

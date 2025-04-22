@@ -12,7 +12,7 @@ sim = ch.ShowerSimulation()
 sim.add(ch.UpwardAxis(zenith,azimuth,curved=True))
 
 #add grid of detectors
-n_side = 30
+n_side = 50
 grid_width = 100000.
 detector_grid_alt = 525. #km
 
@@ -55,7 +55,7 @@ sig = sim.run(mesh=False, att=True)
 #plot signal at each detector
 fig = plt.figure()
 cx = xx.flatten()*1.e-3
-cy = yy.flatten()*1.e-3
+cy = yy.flatten()*1.e-3 - yy.mean()
 h2d = plt.hist2d(cx,cy,weights=sig.photons.sum(axis=2).sum(axis=1),bins=n_side)
 plt.suptitle('Cherenkov Upward Shower Signal at 525km Altitude')
 # plt.title(f'Xmax = {xmax:.1f}, Nmax = {nmax:.1e}, X0 = {x0}, lambda = {Lambda}')

@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, Any
 import eventio
 import numpy as np
 from astropy.table import QTable, Table, Column
@@ -212,6 +212,7 @@ class Signal:
         for i in range(gg.shape[1]):
             gg_td = self.gga.angular_distribution(self.t[i], self.axis.delta[i])
             gg[:,i] = np.interp(self.theta[:,i], self.gga.theta, gg_td)
+        gg[self.theta>np.pi/2] = 0.
         return gg
     
     @property
@@ -277,10 +278,10 @@ class Element(Protocol):
     '''This is the protocol for a simulation element. It needs a type, either
     axis, shower, counters, or yield'''
     @property
-    def element_type(self):
+    def element_type(self) -> str:
         ...
 
-    def create(self) -> object:
+    def create(self) -> Any:
         ...
 
 def x_y_cx_cy(source_points: np.ndarray, counters: Counters) -> tuple[np.ndarray]:
@@ -376,6 +377,9 @@ class ShowerSignal:
             bunches[i,:,6] = photons[i,:]
             bunches[i,:,7] = -l
         return bunches.reshape((-1,8)).astype(np.float32)
+
+def diffunc(r, rc=32.47947175, s=-22.11021685):
+    return np.exp(-(r-s)/rc) 
 
 class ShowerSimulation:
     '''This class is the framework for creating a simulation'''
@@ -518,6 +522,7 @@ class ShowerSimulation:
         times_array = np.empty((self.N_c, len(self.lX_intervals), N_axis_points))
         charged_particle_array = np.empty((len(self.lX_intervals), N_axis_points))
         depth_array = np.empty_like(charged_particle_array)
+        diff = diffunc(self.counters.r)
 
         #calculate signal at each mesh ring
         for i, lX in enumerate(self.lX_intervals):
@@ -532,6 +537,8 @@ class ShowerSimulation:
             axis_vectors[i,:] = meshaxis.vectors
 
             if att:
+                # p = self.get_attenuated_photons_array(signal, curved_correction)
+                # photons_array[:,:,i] = p - (p.T * diff).T
                 photons_array[:,:,i] = self.get_attenuated_photons_array(signal, curved_correction)
             else:
                 photons_array[:,:,i] = signal.calculate_ng()

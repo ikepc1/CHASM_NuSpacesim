@@ -38,6 +38,17 @@ class UpwardAxis(AxisParamContainer):
             return MakeUpwardAxisCurvedAtm(self)
         else:
             return MakeUpwardAxisFlatPlanarAtm(self)
+        
+@dataclass
+class OverLimbAxis(AxisParamContainer):
+    '''This is the container for a user-defined upward axis' parameters.
+    '''
+    def create(self) -> MakeOverLimbAxis:
+        if not self.curved:
+            raise(ValueError('Over the limb showers should use curved atmosphere.'))
+        if self.zenith != np.pi/2:
+            raise(ValueError('With the CHASM geometry convention, over the limb showers should always have a zenith angle of pi/2.'))
+        return MakeOverLimbAxis(self)
 
 @dataclass
 class GHShower:
