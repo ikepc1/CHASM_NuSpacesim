@@ -14,6 +14,7 @@ class AxisParamContainer:
     ground_level: float = 0.
     curved: bool = False
     element_type: str = field(init=False, default='axis', repr=False)
+    maximum_altitude: float = 84852
 
 @dataclass
 class DownwardAxis(AxisParamContainer):

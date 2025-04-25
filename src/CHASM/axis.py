@@ -353,6 +353,11 @@ class AxisParams(Protocol):
     def ground_level(self) -> float:
         ...
 
+    @property
+    def maximum_altitude(self) -> float:
+        ...
+
+
 class Axis(ABC):
     '''This is the abstract base class which contains the methods for computing
     the cartesian vectors and corresponding slant depths of an air shower'''
@@ -368,6 +373,7 @@ class Axis(ABC):
         self.ground_level = params.ground_level
         self.zenith = params.zenith
         self.azimuth = params.azimuth
+        self.maximum_altitude = params.maximum_altitude
         self.altitude = self.set_initial_altitude()
 
     @property
@@ -412,7 +418,7 @@ class Axis(ABC):
 
     def set_initial_altitude(self) -> np.ndarray:
         '''altitude property definition'''
-        return np.linspace(self.ground_level, self.atm.maximum_height, self.config.N_POINTS)
+        return np.linspace(self.ground_level, self.maximum_altitude, self.config.N_POINTS)
 
     @property
     def dh(self) -> np.ndarray:
