@@ -110,7 +110,9 @@ class MakeGHShower(Shower):
         m = (self.X_max-self.X0)/self.Lambda
         n = np.zeros_like(x)
         n[g0] = np.exp( m*(np.log(x[g0])-np.log(m)) - (x[g0]-m) )
-        return self.N_max * n
+        out = self.N_max * n
+        out[out<1.] = 0.
+        return out
 
 class MakeUserShower(Shower):
     '''This is the implementation where a shower profile given by the user'''
